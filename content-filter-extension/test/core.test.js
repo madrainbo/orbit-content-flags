@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { scoreEmotion, urgencySignals } = require('../core/scoring.js');
 const { normalizeDomain, parseList, inList, buildRules } = require('../core/domains.js');
-const { readImageLabels, extractClaimReviews, extractIntent } = require('../core/labels.js');
+const { readImageLabels, extractClaimReviews, extractIntent, parseClaimSearch } = require('../core/labels.js');
 
 test('neutral text scores low', () => {
   const r = scoreEmotion('The city council met on Tuesday to discuss the annual budget and road repairs.');
@@ -119,4 +119,20 @@ test('extractClaimReviews reads nested and @graph markup', () => {
 test('extractIntent reports only declared article types', () => {
   assert.deepEqual(extractIntent([{ '@type': 'OpinionNewsArticle' }, { '@type': 'NewsArticle' }]), ['Marked as opinion']);
   assert.deepEqual(extractIntent([{ '@type': 'NewsArticle', name: 'SatiricalArticle' }]), []);
+});
+
+test('parseClaimSearch flattens reviews and drops unsafe links', () => {
+  const json = { claims: [
+    { text: 'Claim A', claimReview: [
+      { publisher: { name: 'Checker', site: 'checker.org' }, url: 'https://checker.org/a', textualRating: 'False' },
+      { publisher: { site: 'other.org' }, url: 'javascript:alert(1)', textualRating: 'Misleading' },
+    ] },
+    { text: 'Claim B' },
+  ] };
+  assert.deepEqual(parseClaimSearch(json), [
+    { claim: 'Claim A', rating: 'False', publisher: 'Checker', url: 'https://checker.org/a' },
+    { claim: 'Claim A', rating: 'Misleading', publisher: 'other.org', url: '' },
+  ]);
+  assert.deepEqual(parseClaimSearch({}), []);
+  assert.deepEqual(parseClaimSearch(null), []);
 });

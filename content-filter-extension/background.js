@@ -24,10 +24,48 @@ async function syncRules() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(syncRules);
-chrome.runtime.onStartup.addListener(syncRules);
-chrome.storage.onChanged.addListener((_changes, area) => {
+// Opt-in claim lookup. The menu item exists only once the user has saved an
+// API key; nothing is sent until they select text and choose the item.
+const CLAIM_MENU = 'ocf-check-claim';
+async function syncMenu() {
+  await chrome.contextMenus.removeAll();
+  const { factCheckKey = '' } = await chrome.storage.local.get('factCheckKey');
+  if (factCheckKey) {
+    chrome.contextMenus.create({
+      id: CLAIM_MENU,
+      title: 'Check this claim for published fact-checks',
+      contexts: ['selection'],
+    });
+  }
+}
+
+async function checkClaim(tabId, selection) {
+  const query = String(selection || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!query) return;
+  const msg = { type: 'claimResults', query, results: [], error: '' };
+  try {
+    const { factCheckKey = '' } = await chrome.storage.local.get('factCheckKey');
+    const url = 'https://factchecktools.googleapis.com/v1alpha1/claims:search?pageSize=5&query=' +
+      encodeURIComponent(query) + '&key=' + encodeURIComponent(factCheckKey);
+    const res = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!res.ok) msg.error = 'Lookup failed (HTTP ' + res.status + '). Check the API key in settings.';
+    else msg.results = self.OCFLabels.parseClaimSearch(await res.json());
+  } catch {
+    msg.error = 'Lookup failed: could not reach the fact-check service.';
+  }
+  await chrome.tabs.sendMessage(tabId, msg).catch(() => {});
+  return msg;
+}
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === CLAIM_MENU && tab && tab.id != null) checkClaim(tab.id, info.selectionText);
+});
+
+chrome.runtime.onInstalled.addListener(() => { syncRules(); syncMenu(); });
+chrome.runtime.onStartup.addListener(() => { syncRules(); syncMenu(); });
+chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') syncRules();
+  if (area === 'local' && changes.factCheckKey) syncMenu();
 });
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 

@@ -13,7 +13,8 @@
   FLAGS.forEach((k) => { $(k).checked = settings[k]; });
   LISTS.forEach((k) => { $(k).value = stored['lists_' + k].join('\n'); });
 
-  const { disputes = 0 } = await chrome.storage.local.get('disputes');
+  const { disputes = 0, factCheckKey = '' } = await chrome.storage.local.get(['disputes', 'factCheckKey']);
+  $('factCheckKey').value = factCheckKey;
   $('disputes').textContent = disputes === 1
     ? 'You have disputed 1 flag on this device.'
     : 'You have disputed ' + disputes + ' flags on this device.';
@@ -40,6 +41,7 @@
     }
     try {
       await chrome.storage.sync.set(out);
+      await chrome.storage.local.set({ factCheckKey: $('factCheckKey').value.trim() });
       LISTS.forEach((k) => { $(k).value = out['lists_' + k].join('\n'); });
       status('Saved.');
     } catch (e) {

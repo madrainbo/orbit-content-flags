@@ -13,6 +13,8 @@
   .muted { color:var(--muted); margin:.15rem 0 .5rem; }
   label.check { display:block; margin:.35rem 0; }
   .lists { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(13rem, 1fr)); }
+  input[type=password] { font:13px/1.4 ui-monospace, monospace; width:22rem; max-width:100%; box-sizing:border-box; padding:.35rem .5rem;
+    background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:.4rem; }
   textarea { width:100%; box-sizing:border-box; min-height:11rem; font:13px/1.4 ui-monospace, monospace;
              background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:.4rem; padding:.5rem; }
   button { font:inherit; margin-top:1rem; padding:.55rem 1.1rem; border-radius:.4rem; border:1px solid var(--accent);
@@ -30,6 +32,10 @@
   <label class="check"><input type="checkbox" id="showMedium"> Also label medium emotional charge</label>
   <label class="check"><input type="checkbox" id="blurHigh"> Blur high-charge text until I hover over it</label>
   <label class="check"><input type="checkbox" id="readImageLabels"> Read AI and Content Credentials labels from images (re-requests up to 20 images per page from their own sites, without cookies)</label>
+
+  <h2>Claim lookup (optional)</h2>
+  <p class="muted">Off unless you add a key. With a key saved, selecting text and choosing "Check this claim" from the right-click menu sends <strong>only the selected text</strong> to Google's Fact Check Tools service and lists any published fact-checks. The key stays on this device and does not sync.</p>
+  <label>Google Fact Check Tools API key <input type="password" id="factCheckKey" autocomplete="off" spellcheck="false"></label>
 
   <h2>Domain lists</h2>
   <p class="muted">One domain per line; subdomains are included. Allow beats block, and block beats warn. Up to 300 per list.</p>

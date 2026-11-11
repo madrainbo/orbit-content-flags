@@ -130,6 +130,37 @@ const PAGE = `<!doctype html><title>t</title>
     await page.goto(`http://plain.test:${port}/`);
     assert.equal(page.url(), `http://plain.test:${port}/`);
 
+    // 7. Claim lookup is absent until a key is saved, then reports results.
+    //    The fact-check service is stubbed; no real request is made.
+    const menuBefore = await sw.evaluate(() => new Promise((r) =>
+      chrome.contextMenus.update('ocf-check-claim', {}, () => r(!chrome.runtime.lastError))));
+    assert.equal(menuBefore, false, 'no menu item without a key');
+    await opts.fill('#factCheckKey', 'test-key');
+    await opts.click('#save');
+    const lookup = await sw.evaluate(async () => {
+      for (let i = 0; i < 50; i++) {
+        const ok = await new Promise((r) =>
+          chrome.contextMenus.update('ocf-check-claim', {}, () => r(!chrome.runtime.lastError)));
+        if (ok) break;
+        if (i === 49) throw new Error('menu item not created');
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      let requested = '';
+      self.fetch = async (u) => {
+        requested = String(u);
+        return new Response(JSON.stringify({ claims: [{ text: 'The moon is cheese', claimReview: [
+          { publisher: { name: 'Stub Checker' }, url: 'https://stub.example/x', textualRating: 'Pants on fire' },
+        ] }] }));
+      };
+      const [tab] = await chrome.tabs.query({ url: 'http://plain.test/*' });
+      await checkClaim(tab.id, '  moon   is cheese ');
+      return requested;
+    });
+    assert.match(lookup, /^https:\/\/factchecktools\.googleapis\.com\/v1alpha1\/claims:search\?pageSize=5&query=moon%20is%20cheese&key=test-key$/);
+    await page.waitForFunction(() => /Looked up/.test(document.getElementById('ocf-panel-host').shadowRoot.textContent));
+    const looked = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
+    assert.match(looked, /Looked up: .The moon is cheese.*Rated .Pants on fire. by Stub Checker/);
+
     console.log('e2e: all checks passed');
   } finally {
     await ctx.close();

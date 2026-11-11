@@ -84,7 +84,25 @@
     return [...found];
   }
 
-  const api = { readImageLabels, extractClaimReviews, extractIntent, SOURCE_TYPES, INTENT_TYPES };
+  // Response of the Google Fact Check Tools API claims:search method.
+  function parseClaimSearch(json) {
+    const out = [];
+    const claims = json && Array.isArray(json.claims) ? json.claims : [];
+    for (const c of claims) {
+      for (const r of Array.isArray(c.claimReview) ? c.claimReview : []) {
+        const url = text(r.url);
+        out.push({
+          claim: text(c.text),
+          rating: text(r.textualRating),
+          publisher: nameOf(r.publisher) || text(r.publisher && r.publisher.site),
+          url: /^https?:\/\//i.test(url) ? url : '',
+        });
+      }
+    }
+    return out.slice(0, 5);
+  }
+
+  const api = { readImageLabels, extractClaimReviews, extractIntent, parseClaimSearch, SOURCE_TYPES, INTENT_TYPES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OCFLabels = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Orbit Content Flags",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Flags emotionally charged text, declared AI and fact-check labels, and draining design patterns on-device, and warns or blocks on domains you list. Signals, not verdicts.",
   "minimum_chrome_version": "121",
-  "permissions": ["storage", "declarativeNetRequest"],
+  "permissions": ["storage", "declarativeNetRequest", "contextMenus"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
   "action": { "default_title": "Orbit Content Flags settings" },

@@ -15,13 +15,36 @@
   const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
   const state = { high: 0, medium: 0, scanned: 0, images: 0, signals: new Map() };
+  let host = null;
+  let dismissed = false;
 
   // group: one of GROUPS. el (optional): element to scroll to from the panel.
-  function addSignal(group, id, label, why, el) {
+  function addSignal(group, id, label, why, el, url) {
     if (state.signals.has(id)) return;
-    state.signals.set(id, { group, label, why, el });
+    state.signals.set(id, { group, label, why, el, url });
     renderPanel();
   }
+
+  // Results of a claim lookup the user asked for from the context menu.
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'claimResults') return;
+    for (const id of [...state.signals.keys()]) if (id.startsWith('lookup-')) state.signals.delete(id);
+    dismissed = false;
+    const q = '\u201c' + msg.query.slice(0, 80) + (msg.query.length > 80 ? '\u2026' : '') + '\u201d';
+    if (msg.error) {
+      addSignal('Fact-checks', 'lookup-error', 'Lookup for ' + q + ':', msg.error);
+    } else if (!msg.results.length) {
+      addSignal('Fact-checks', 'lookup-none', 'No published fact-check found for ' + q + '.',
+        'That does not mean the claim is true.');
+    } else {
+      msg.results.forEach((r, i) => {
+        const who = r.publisher ? ' by ' + r.publisher : '';
+        addSignal('Fact-checks', 'lookup-' + i, 'Looked up: \u201c' + r.claim.slice(0, 140) + '\u201d',
+          (r.rating ? 'Rated \u201c' + r.rating + '\u201d' : 'Reviewed') + who + '.', null, r.url);
+      });
+    }
+    renderPanel();
+  });
 
   // ---------- emotional charge ----------
 
@@ -186,8 +209,6 @@
 
   // ---------- page panel (one badge for every label type) ----------
 
-  let host = null;
-  let dismissed = false;
   function renderPanel() {
     if (dismissed) return;
     const total = state.high + state.medium + state.signals.size;
@@ -214,7 +235,8 @@
       'ul{margin:0;padding-left:16px}li{margin:2px 0;overflow-wrap:anywhere}small{opacity:.75}' +
       'button{all:unset;cursor:pointer;padding:0 4px}' +
       'button.close{font-size:15px;line-height:1}button.show{text-decoration:underline;font-size:12px}' +
-      'button:focus-visible{outline:2px solid currentColor;border-radius:3px}';
+      'a{color:inherit;font-size:12px}' +
+      'button:focus-visible,a:focus-visible{outline:2px solid currentColor;border-radius:3px}';
     const box = document.createElement('div');
     box.className = 'box';
     const head = document.createElement('div');
@@ -246,6 +268,14 @@
           const s = document.createElement('small');
           s.textContent = ' ' + it.why;
           li.appendChild(s);
+        }
+        if (it.url) {
+          const a = document.createElement('a');
+          a.href = it.url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = 'Open';
+          li.append(' ', a);
         }
         if (it.el && it.el.isConnected) {
           const b = document.createElement('button');
