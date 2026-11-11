@@ -10,14 +10,48 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 
 const EXT = path.resolve(__dirname, '..');
+const zlib = require('node:zlib');
+
+// Builds a valid 240x240 grey PNG, optionally with an XMP text chunk.
+function png(xmp) {
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(zlib.crc32(body) >>> 0, body.length + 4);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(240, 0); ihdr.writeUInt32BE(240, 4);
+  ihdr[8] = 8; // bit depth; colour type 0 (greyscale) and the rest stay 0
+  const parts = [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr)];
+  if (xmp) parts.push(chunk('iTXt', Buffer.from('XML:com.adobe.xmp\0\0\0\0\0' + xmp, 'latin1')));
+  parts.push(chunk('IDAT', zlib.deflateSync(Buffer.alloc(240 * 241, 0x80))), chunk('IEND', Buffer.alloc(0)));
+  return Buffer.concat(parts);
+}
+const AI_PNG = png('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description Iptc4xmpExt:DigitalSourceType=' +
+  '"http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"/></x:xmpmeta>');
+const PLAIN_PNG = png(null);
+
 const PAGE = `<!doctype html><title>t</title>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"ClaimReview",
+"claimReviewed":"The moon is made of cheese","reviewRating":{"@type":"Rating","alternateName":"False"},
+"author":{"@type":"Organization","name":"Example Checks"}}</script>
+<script type="application/ld+json">{broken json</script>
+<a rel="nofollow sponsored" href="#">Buy now</a>
+<img src="/ai.png" id="ai"><img src="/plain.png" id="plain">
 <h1>SHOCKING betrayal: corrupt officials DESTROY town in terrifying disaster!!!</h1>
 <p>The city council met on Tuesday to discuss the annual budget and road repairs.</p>
 <p>Hurry! Only 3 left in stock.</p>
 <video autoplay muted></video>`;
 
 (async () => {
-  const server = http.createServer((_req, res) => {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/ai.png' || req.url === '/plain.png') {
+      res.writeHead(200, { 'content-type': 'image/png' });
+      return res.end(req.url === '/ai.png' ? AI_PNG : PLAIN_PNG);
+    }
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end(PAGE);
   }).listen(0, '127.0.0.1');
@@ -46,6 +80,14 @@ const PAGE = `<!doctype html><title>t</title>
     assert.match(panel, /1 high-charge passage/);
     assert.match(panel, /Pressure wording/);
     assert.match(panel, /Autoplay video/);
+
+    // 1b. Declared labels: AI image metadata, fact-check markup, sponsored links.
+    await page.waitForSelector('#ai.ocf-img-flag');
+    assert.equal(await page.locator('.ocf-img-flag').count(), 1, 'the plain image is not flagged');
+    const labels = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
+    assert.match(labels, /Declared AI-generated image/);
+    assert.match(labels, /The moon is made of cheese.*Rated .False. by Example Checks/);
+    assert.match(labels, /1 sponsored link\./);
 
     // 2. Dispute removes the chip and is counted.
     await page.locator('.ocf-chip').click();

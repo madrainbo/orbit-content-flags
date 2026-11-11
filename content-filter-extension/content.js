@@ -1,16 +1,27 @@
-// Content script: scores visible text on-device and reports page-level
-// "draining design" signals. Nothing read here leaves the page.
+// Content script: scores visible text on-device, reads labels the page already
+// declares, and reports "draining design" signals. Page content is never sent
+// anywhere; the only requests are re-reads of images already on the page.
 (async function () {
   'use strict';
   const { scoreEmotion, urgencySignals } = globalThis.OCFScoring;
+  const { extractClaimReviews, extractIntent } = globalThis.OCFLabels;
   const stored = await chrome.storage.sync.get({ settings: {} });
-  const settings = { enabled: true, showMedium: false, blurHigh: false, ...stored.settings };
+  const settings = { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true, ...stored.settings };
   if (!settings.enabled) return;
 
   const MAX_BLOCKS = 600;
+  const MAX_IMAGES = 20;
   const SELECTOR = 'h1, h2, h3, p, [role="heading"]';
+  const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
-  const state = { high: 0, medium: 0, scanned: 0, signals: new Map() };
+  const state = { high: 0, medium: 0, scanned: 0, images: 0, signals: new Map() };
+
+  // group: one of GROUPS. el (optional): element to scroll to from the panel.
+  function addSignal(group, id, label, why, el) {
+    if (state.signals.has(id)) return;
+    state.signals.set(id, { group, label, why, el });
+    renderPanel();
+  }
 
   // ---------- emotional charge ----------
 
@@ -52,7 +63,7 @@
     const nodes = root.matches && root.matches(SELECTOR) ? [root] : [];
     if (root.querySelectorAll) nodes.push(...root.querySelectorAll(SELECTOR));
     for (const el of nodes) {
-      if (state.scanned >= MAX_BLOCKS) return;
+      if (state.scanned >= MAX_BLOCKS) break;
       if (seen.has(el) || el.closest('.ocf-chip')) continue;
       seen.add(el);
       const text = (el.innerText || '').trim().slice(0, 2000);
@@ -64,21 +75,74 @@
         flag(el, result);
       }
     }
+    if (settings.readImageLabels) scanImages(root);
+  }
+
+  // ---------- declared labels: images ----------
+
+  async function checkImage(img) {
+    const url = img.currentSrc || img.src;
+    if (!/^https?:/i.test(url)) return;
+    let res;
+    try { res = await chrome.runtime.sendMessage({ type: 'imageLabels', url }); } catch { return; }
+    if (!res || !res.ok) return;
+    if (res.label) {
+      img.classList.add('ocf-img-flag');
+      img.title = res.label + ' (image metadata, unverified)' + (img.title ? ' · ' + img.title : '');
+      addSignal('Origin', 'img-' + url, res.label + ' image.',
+        'Read from the file’s metadata; not verified.', img);
+    } else if (res.hasContentCredentials) {
+      addSignal('Origin', 'c2pa-' + url, 'Image carries Content Credentials.',
+        'Signature not checked by this version.', img);
+    }
+  }
+
+  function scanImages(root) {
+    const imgs = root.tagName === 'IMG' ? [root] : root.querySelectorAll ? root.querySelectorAll('img') : [];
+    for (const img of imgs) {
+      if (state.images >= MAX_IMAGES) return;
+      if (seen.has(img)) continue;
+      const ready = () => {
+        if (seen.has(img) || state.images >= MAX_IMAGES) return;
+        if (img.naturalWidth < 200 || img.naturalHeight < 200) return;
+        seen.add(img);
+        state.images += 1;
+        checkImage(img);
+      };
+      if (img.complete) ready(); else img.addEventListener('load', ready, { once: true });
+    }
+  }
+
+  // ---------- declared labels: page markup ----------
+
+  function readMarkup() {
+    const docs = [];
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try { docs.push(JSON.parse(s.textContent)); } catch { /* malformed markup: skip */ }
+    }
+    extractClaimReviews(docs).slice(0, 5).forEach((r, i) => {
+      const who = r.publisher ? ' by ' + r.publisher : '';
+      const verdict = r.rating ? 'Rated “' + r.rating + '”' + who + '.' : 'Reviewed' + who + '.';
+      addSignal('Fact-checks', 'claim-' + i, '“' + r.claim.slice(0, 140) + '”', verdict);
+    });
+    extractIntent(docs).forEach((label) => {
+      addSignal('Intent', 'intent-' + label, label + '.', 'Declared by the publisher.');
+    });
+    const sponsored = document.querySelectorAll('a[rel~="sponsored"]');
+    if (sponsored.length) {
+      addSignal('Intent', 'sponsored-links',
+        sponsored.length + ' sponsored link' + (sponsored.length === 1 ? '' : 's') + '.',
+        'Marked rel="sponsored" by the publisher.', sponsored[0]);
+    }
   }
 
   // ---------- draining design ----------
-
-  function addSignal(id, label, why) {
-    if (state.signals.has(id)) return;
-    state.signals.set(id, { label, why });
-    renderPanel();
-  }
 
   function checkAutoplay() {
     for (const v of document.querySelectorAll('video')) {
       const playingUnasked = !v.paused && !(navigator.userActivation && navigator.userActivation.hasBeenActive);
       if (v.autoplay || playingUnasked) {
-        addSignal('autoplay', 'Autoplay video', 'A video starts without you pressing play.');
+        addSignal('Design', 'autoplay', 'Autoplay video.', 'A video starts without you pressing play.', v);
         return;
       }
     }
@@ -87,7 +151,7 @@
   function checkUrgency() {
     const text = (document.body.innerText || '').slice(0, 200000);
     for (const s of urgencySignals(text)) {
-      addSignal('urgency-' + s.id, 'Pressure wording', 'Found “' + s.match + '”.');
+      addSignal('Design', 'urgency-' + s.id, 'Pressure wording.', 'Found “' + s.match + '”.');
     }
     return text;
   }
@@ -100,7 +164,7 @@
       const nowText = (document.body.innerText || '').slice(0, 200000);
       const after = (nowText.match(TIMER_RE) || []).join('|');
       if (after && after !== before && /\b(?:offer|sale|deal|discount|ends|left|remaining)\b/i.test(nowText)) {
-        addSignal('countdown', 'Countdown timer', 'A running timer appears next to offer wording.');
+        addSignal('Design', 'countdown', 'Countdown timer.', 'A running timer appears next to offer wording.');
       }
     }, 2500);
   }
@@ -115,12 +179,12 @@
       if (nearBottom) growths += 1;
       lastHeight = doc.scrollHeight;
       if (growths >= 3) {
-        addSignal('infinite-scroll', 'Infinite scroll', 'The page keeps loading more as you reach the end.');
+        addSignal('Design', 'infinite-scroll', 'Infinite scroll.', 'The page keeps loading more as you reach the end.');
       }
     }
   }
 
-  // ---------- page panel ----------
+  // ---------- page panel (one badge for every label type) ----------
 
   let host = null;
   let dismissed = false;
@@ -141,11 +205,15 @@
     style.textContent =
       ':host{color-scheme:light dark}' +
       '.box{font:13px/1.45 system-ui,sans-serif;background:#fff;color:#1a1a1a;border:1px solid #c9cdd2;' +
-      'border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18);padding:8px 10px;max-width:280px}' +
+      'border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18);padding:8px 10px;max-width:300px;' +
+      'max-height:60vh;overflow:auto}' +
       '@media (prefers-color-scheme:dark){.box{background:#202124;color:#ececec;border-color:#4a4d51}}' +
       '.head{display:flex;justify-content:space-between;gap:10px;font-weight:600}' +
-      'ul{margin:6px 0 0;padding-left:16px}li{margin:2px 0}small{opacity:.75}' +
-      'button{all:unset;cursor:pointer;padding:0 4px;font-size:15px;line-height:1}' +
+      'h3{font:600 11px/1.4 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;' +
+      'opacity:.7;margin:8px 0 2px}' +
+      'ul{margin:0;padding-left:16px}li{margin:2px 0;overflow-wrap:anywhere}small{opacity:.75}' +
+      'button{all:unset;cursor:pointer;padding:0 4px}' +
+      'button.close{font-size:15px;line-height:1}button.show{text-decoration:underline;font-size:12px}' +
       'button:focus-visible{outline:2px solid currentColor;border-radius:3px}';
     const box = document.createElement('div');
     box.className = 'box';
@@ -154,31 +222,49 @@
     const title = document.createElement('span');
     title.textContent = 'Content flags on this page';
     const close = document.createElement('button');
+    close.className = 'close';
     close.textContent = '×';
     close.setAttribute('aria-label', 'Dismiss content flags');
     close.addEventListener('click', () => { dismissed = true; host.remove(); host = null; });
     head.append(title, close);
-    const list = document.createElement('ul');
-    const item = (label, why) => {
-      const li = document.createElement('li');
-      li.textContent = label;
-      if (why) {
-        const s = document.createElement('small');
-        s.textContent = ' ' + why;
-        li.appendChild(s);
+    box.appendChild(head);
+
+    const byGroup = new Map(GROUPS.map((g) => [g, []]));
+    if (state.high) byGroup.get('Emotional charge').push({ label: state.high + ' high-charge passage' + (state.high === 1 ? '' : 's') + '.' });
+    if (state.medium) byGroup.get('Emotional charge').push({ label: state.medium + ' medium-charge passage' + (state.medium === 1 ? '' : 's') + '.' });
+    for (const s of state.signals.values()) byGroup.get(s.group).push(s);
+
+    for (const [group, items] of byGroup) {
+      if (!items.length) continue;
+      const h = document.createElement('h3');
+      h.textContent = group;
+      const list = document.createElement('ul');
+      for (const it of items) {
+        const li = document.createElement('li');
+        li.textContent = it.label;
+        if (it.why) {
+          const s = document.createElement('small');
+          s.textContent = ' ' + it.why;
+          li.appendChild(s);
+        }
+        if (it.el && it.el.isConnected) {
+          const b = document.createElement('button');
+          b.className = 'show';
+          b.textContent = 'Show';
+          b.addEventListener('click', () => it.el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+          li.append(' ', b);
+        }
+        list.appendChild(li);
       }
-      list.appendChild(li);
-    };
-    if (state.high) item(state.high + ' high-charge passage' + (state.high === 1 ? '' : 's'));
-    if (state.medium) item(state.medium + ' medium-charge passage' + (state.medium === 1 ? '' : 's'));
-    for (const s of state.signals.values()) item(s.label + '.', s.why);
-    box.append(head, list);
+      box.append(h, list);
+    }
     root.append(style, box);
   }
 
   // ---------- run ----------
 
   scan(document.body);
+  readMarkup();
   renderPanel();
   const firstText = checkUrgency();
   checkCountdown(firstText);

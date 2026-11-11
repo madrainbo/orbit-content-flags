@@ -16,3 +16,4 @@
 .ocf-chip.ocf-medium { color: #7a5a00; }
 .ocf-blur { filter: blur(5px); transition: filter .15s; }
 .ocf-blur:hover, .ocf-blur:focus-within { filter: none; }
+.ocf-img-flag { outline: 3px solid #a12b1e; outline-offset: -3px; }

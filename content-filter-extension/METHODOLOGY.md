@@ -1,6 +1,6 @@
-# Methodology (v0.1)
+# Methodology (v0.2)
 
-Published so the thresholds can be criticised. Every number here is a starting choice, not a validated benchmark. The code is in `core/scoring.js` and `content.js`.
+Published so the thresholds can be criticised. Every number here is a starting choice, not a validated benchmark. The code is in `core/scoring.js`, `core/labels.js` and `content.js`.
 
 ## Emotional charge
 
@@ -35,6 +35,24 @@ The lexicon is about 50 English stems in three groups (outrage, fear, bait). It 
 | Countdown timer | an `HH:MM:SS` value changes within 2.5s on a page that also contains offer wording |
 
 Pressure wording and countdown timers correspond to the urgency and scarcity categories in Mathur et al., "Dark Patterns at Scale" (CSCW 2019, arXiv:1907.07032). A match means the pattern is present, not that the claim is false.
+
+## Declared labels
+
+These are read, not inferred. Each reports what a publisher or tool has stated about its own content.
+
+| Label | Source | Rule |
+|---|---|---|
+| Declared AI-generated | IPTC Digital Source Type in image metadata | value is `trainedAlgorithmicMedia` |
+| Declared partly AI-generated / composite | same | value is `compositeWithTrainedAlgorithmicMedia` or `compositeSynthetic` |
+| Declared algorithmically generated | same | value is `algorithmicMedia` |
+| Carries Content Credentials | C2PA manifest store in the file | a JUMBF box labelled `c2pa` is present |
+| Fact-check | schema.org `ClaimReview` in the page's JSON-LD | claim, rating and reviewer are shown as written |
+| Opinion / satire / advertiser content | schema.org article type in JSON-LD | `OpinionNewsArticle`, `SatiricalArticle`, `AdvertiserContentArticle` |
+| Sponsored links | link markup | `rel` contains `sponsored` |
+
+Images are checked only if at least 200x200 pixels, up to 20 per page, by searching the first 256 KB of the file for the source-type URI. No per-format parsing is done.
+
+**What these do not mean:** none of them is verified. Metadata can be stripped, so an unlabelled image is not evidence of authenticity, and it can be forged, so a label is not proof either. Content Credentials signatures are not validated in this version; the label reports presence only. A `ClaimReview` is the site's own statement and is not checked against a list of recognised fact-checkers.
 
 ## Corrections
 

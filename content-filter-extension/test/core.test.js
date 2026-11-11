@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { scoreEmotion, urgencySignals } = require('../core/scoring.js');
 const { normalizeDomain, parseList, inList, buildRules } = require('../core/domains.js');
+const { readImageLabels, extractClaimReviews, extractIntent } = require('../core/labels.js');
 
 test('neutral text scores low', () => {
   const r = scoreEmotion('The city council met on Tuesday to discuss the annual budget and road repairs.');
@@ -73,4 +74,49 @@ test('buildRules applies allow > block > warn', () => {
   assert.ok(re.test('http://sub.meh.com:8080/path?q=1'));
   assert.ok(!re.test('https://notmeh.com/'));
   assert.ok(!re.test('https://meh.com.evil.org/'));
+});
+
+test('readImageLabels finds a declared AI source type in XMP', () => {
+  const xmp = 'junk\x00<x:xmpmeta><rdf:Description Iptc4xmpExt:DigitalSourceType=' +
+    '"http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"/></x:xmpmeta>';
+  const r = readImageLabels(xmp);
+  assert.equal(r.sourceType, 'trainedAlgorithmicMedia');
+  assert.equal(r.origin, 'ai-generated');
+  assert.equal(r.hasContentCredentials, false);
+});
+
+test('readImageLabels does not label camera captures or plain files', () => {
+  const cam = readImageLabels('http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture');
+  assert.equal(cam.sourceType, 'digitalCapture');
+  assert.equal(cam.label, null);
+  assert.deepEqual(readImageLabels('\x89PNG plain bytes'),
+    { sourceType: null, origin: null, label: null, hasContentCredentials: false });
+});
+
+test('readImageLabels detects a C2PA manifest store', () => {
+  assert.equal(readImageLabels('....jumb....jumdc2pa\x00....').hasContentCredentials, true);
+  assert.equal(readImageLabels('a c2pa mention only').hasContentCredentials, false);
+});
+
+test('extractClaimReviews reads nested and @graph markup', () => {
+  const docs = [{
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'WebPage', name: 'x' },
+      {
+        '@type': ['ClaimReview'],
+        claimReviewed: 'The moon is made of cheese',
+        reviewRating: { '@type': 'Rating', alternateName: 'False' },
+        author: { '@type': 'Organization', name: 'Example Checks' },
+      },
+    ],
+  }, { '@type': 'ClaimReview' }, null, 'text'];
+  assert.deepEqual(extractClaimReviews(docs), [
+    { claim: 'The moon is made of cheese', rating: 'False', publisher: 'Example Checks' },
+  ]);
+});
+
+test('extractIntent reports only declared article types', () => {
+  assert.deepEqual(extractIntent([{ '@type': 'OpinionNewsArticle' }, { '@type': 'NewsArticle' }]), ['Marked as opinion']);
+  assert.deepEqual(extractIntent([{ '@type': 'NewsArticle', name: 'SatiricalArticle' }]), []);
 });

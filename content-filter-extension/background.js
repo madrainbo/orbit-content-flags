@@ -1,9 +1,9 @@
-importScripts('core/domains.js');
+importScripts('core/domains.js', 'core/labels.js');
 const { buildRules, inList, normalizeDomain } = self.OCFDomains;
 
 const DEFAULTS = {
   lists_block: [], lists_warn: [], lists_allow: [],
-  settings: { enabled: true, showMedium: false, blurHigh: false },
+  settings: { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true },
 };
 
 async function readLists() {
@@ -57,9 +57,53 @@ async function proceed(rawUrl) {
   return { ok: true };
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg && msg.type === 'proceed') {
+// Reads declared labels from the first 256 KB of an image already shown on a
+// page. Sent without cookies; the bytes are inspected here and discarded.
+const IMAGE_BYTES = 262144;
+const imageCache = new Map();
+async function imageLabels(rawUrl) {
+  let u;
+  try { u = new URL(rawUrl); } catch { return { ok: false }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false };
+  if (imageCache.has(u.href)) return imageCache.get(u.href);
+  const res = await fetch(u.href, {
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+    headers: { Range: 'bytes=0-' + (IMAGE_BYTES - 1) },
+  });
+  if (!res.ok || !res.body) return { ok: false };
+  const reader = res.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (size < IMAGE_BYTES) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.length;
+  }
+  reader.cancel().catch(() => {});
+  const bytes = new Uint8Array(Math.min(size, IMAGE_BYTES));
+  let off = 0;
+  for (const c of chunks) {
+    const part = c.subarray(0, bytes.length - off);
+    bytes.set(part, off);
+    off += part.length;
+    if (off >= bytes.length) break;
+  }
+  const out = { ok: true, ...self.OCFLabels.readImageLabels(new TextDecoder('latin1').decode(bytes)) };
+  if (imageCache.size > 500) imageCache.clear();
+  imageCache.set(u.href, out);
+  return out;
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || sender.id !== chrome.runtime.id) return;
+  if (msg.type === 'proceed') {
     proceed(msg.url).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
+  if (msg.type === 'imageLabels') {
+    imageLabels(msg.url).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
 });

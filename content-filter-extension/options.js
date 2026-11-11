@@ -3,10 +3,10 @@
   const $ = (id) => document.getElementById(id);
   const DEFAULTS = {
     lists_block: [], lists_warn: [], lists_allow: [],
-    settings: { enabled: true, showMedium: false, blurHigh: false },
+    settings: { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true },
   };
   const LISTS = ['warn', 'block', 'allow'];
-  const FLAGS = ['enabled', 'showMedium', 'blurHigh'];
+  const FLAGS = ['enabled', 'showMedium', 'blurHigh', 'readImageLabels'];
 
   const stored = await chrome.storage.sync.get(DEFAULTS);
   const settings = { ...DEFAULTS.settings, ...stored.settings };
