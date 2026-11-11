@@ -1,0 +1,18 @@
+.ocf-chip {
+  all: revert;
+  display: inline-block;
+  margin-left: .4em;
+  padding: 0 .45em;
+  border-radius: .7em;
+  font: 600 11px/1.6 system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: middle;
+  cursor: pointer;
+  border: 1px solid currentColor;
+  background: #fff;
+}
+.ocf-chip.ocf-high { color: #a12b1e; }
+.ocf-chip.ocf-medium { color: #7a5a00; }
+.ocf-blur { filter: blur(5px); transition: filter .15s; }
+.ocf-blur:hover, .ocf-blur:focus-within { filter: none; }

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site on your list</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fafafa; --muted:#5f6368; --line:#d0d4d9; --accent:#1a56db; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#ececec; --bg:#161718; --muted:#a0a4a8; --line:#3a3d41; --accent:#8ab4f8; } }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--fg);
+         font:16px/1.5 system-ui, sans-serif; }
+  main { max-width:32rem; padding:2rem 1rem; }
+  h1 { font-size:1.4rem; margin:0 0 .5rem; }
+  p { color:var(--muted); margin:.25rem 0 1.25rem; overflow-wrap:anywhere; }
+  .row { display:flex; gap:.75rem; flex-wrap:wrap; }
+  button { font:inherit; padding:.55rem 1rem; border-radius:.4rem; border:1px solid var(--line);
+           background:transparent; color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:var(--bg); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title"></h1>
+  <p id="detail"></p>
+  <div class="row">
+    <button class="primary" id="back">Go back</button>
+    <button id="proceed" hidden>Continue for this session</button>
+    <button id="settings">Edit lists</button>
+  </div>
+</main>
+<script src="warn.js"></script>
+</body>
+</html>

@@ -50,3 +50,7 @@ Maintainers who believe a flagged signal is explained by a legitimate event (pre
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Related: Orbit Content Flags
+
+[`content-filter-extension/`](content-filter-extension/) holds a separate, early-stage Chrome extension that applies the same signals-not-verdicts approach to on-screen content. It is independent of `orbit_check.py`.

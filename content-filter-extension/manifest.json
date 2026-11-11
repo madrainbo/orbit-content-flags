@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Orbit Content Flags",
+  "version": "0.1.0",
+  "description": "Flags emotionally charged text and draining design patterns on-device, and warns or blocks on domains you list. Signals, not verdicts.",
+  "minimum_chrome_version": "121",
+  "permissions": ["storage", "declarativeNetRequest"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Orbit Content Flags settings" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["core/scoring.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["warn.html"], "matches": ["<all_urls>"] }
+  ]
+}

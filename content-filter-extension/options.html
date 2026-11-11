@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Content Flags</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fafafa; --muted:#5f6368; --line:#d0d4d9; --accent:#1a56db; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#ececec; --bg:#161718; --muted:#a0a4a8; --line:#3a3d41; --accent:#8ab4f8; --bad:#f2b8b5; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:44rem; margin:0 auto; padding:1.5rem 1rem 3rem; }
+  h1 { font-size:1.4rem; } h2 { font-size:1.05rem; margin:1.75rem 0 .5rem; }
+  .muted { color:var(--muted); margin:.15rem 0 .5rem; }
+  label.check { display:block; margin:.35rem 0; }
+  .lists { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(13rem, 1fr)); }
+  textarea { width:100%; box-sizing:border-box; min-height:11rem; font:13px/1.4 ui-monospace, monospace;
+             background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:.4rem; padding:.5rem; }
+  button { font:inherit; margin-top:1rem; padding:.55rem 1.1rem; border-radius:.4rem; border:1px solid var(--accent);
+           background:var(--accent); color:var(--bg); cursor:pointer; }
+  #status { margin-left:.75rem; } #status.bad { color:var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Orbit Content Flags</h1>
+  <p class="muted">Everything is scored on this device. Page content is never sent anywhere; only these settings sync through your browser account.</p>
+
+  <h2>Flags</h2>
+  <label class="check"><input type="checkbox" id="enabled"> Enable flags and domain lists</label>
+  <label class="check"><input type="checkbox" id="showMedium"> Also label medium emotional charge</label>
+  <label class="check"><input type="checkbox" id="blurHigh"> Blur high-charge text until I hover over it</label>
+
+  <h2>Domain lists</h2>
+  <p class="muted">One domain per line; subdomains are included. Allow beats block, and block beats warn. Up to 300 per list.</p>
+  <div class="lists">
+    <label>Warn before opening<textarea id="warn" spellcheck="false"></textarea></label>
+    <label>Block<textarea id="block" spellcheck="false"></textarea></label>
+    <label>Always allow<textarea id="allow" spellcheck="false"></textarea></label>
+  </div>
+  <button id="save">Save</button><span id="status" role="status"></span>
+
+  <h2>Your disputes</h2>
+  <p class="muted" id="disputes"></p>
+</main>
+<script src="core/domains.js"></script>
+<script src="options.js"></script>
+</body>
+</html>
