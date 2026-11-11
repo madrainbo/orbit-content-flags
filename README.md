@@ -53,4 +53,8 @@ MIT — see [LICENSE](LICENSE).
 
 ## Related: Orbit Content Flags
 
-[`content-filter-extension/`](content-filter-extension/) holds a separate, early-stage Chrome extension that applies the same signals-not-verdicts approach to on-screen content. It is independent of `orbit_check.py`.
+A separate, early-stage product that applies the same signals-not-verdicts approach to on-screen content. It is independent of `orbit_check.py`.
+
+- [`content-filter-extension/`](content-filter-extension/): Chrome and Edge extension.
+- [`android/`](android/): Android app that flags text in any app and blocks listed domains.
+- [`shared/`](shared/): scoring test vectors that both are checked against.

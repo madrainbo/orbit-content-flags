@@ -1,0 +1,21 @@
+package dev.orbitflags.app
+
+import android.content.Context
+import dev.orbitflags.core.Domains
+
+/** Domain lists, kept on the device in the app's private storage. */
+object Prefs {
+    private const val FILE = "ocf"
+
+    fun text(context: Context, key: String): String =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString(key, "") ?: ""
+
+    fun list(context: Context, key: String): List<String> = Domains.parseList(text(context, key)).valid
+
+    fun save(context: Context, block: List<String>, allow: List<String>) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString("block", block.joinToString("\n"))
+            .putString("allow", allow.joinToString("\n"))
+            .apply()
+    }
+}

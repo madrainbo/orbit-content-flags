@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- isAccessibilityTool is false: this app is not an assistive tool, so Play's
+     prominent-disclosure and consent rules apply (see MainActivity). -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewScrolled"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/flags_service_description"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="300" />

@@ -136,3 +136,9 @@ test('parseClaimSearch flattens reviews and drops unsafe links', () => {
   assert.deepEqual(parseClaimSearch({}), []);
   assert.deepEqual(parseClaimSearch(null), []);
 });
+
+test('shared scoring vectors are current', () => {
+  const { FILE, render } = require('./vectors.js');
+  assert.equal(require('node:fs').readFileSync(FILE, 'utf8'), render(),
+    'run: node test/vectors.js --write');
+});
