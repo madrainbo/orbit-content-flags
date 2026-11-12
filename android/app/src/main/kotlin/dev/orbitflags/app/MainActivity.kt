@@ -78,18 +78,32 @@ class MainActivity : Activity() {
             isChecked = Prefs.hideFlagged(this@MainActivity)
             setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
         })
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Also read text inside images (captures the screen on this device)"
+            isChecked = Prefs.readImages(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setReadImages(this@MainActivity, checked) }
+        })
         body("Most screens produce no flag. To check it is working, show the sample below: " +
-            "three samples should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again.").setPadding(0, dp(12), 0, 0)
+            "four samples, the last one a picture of text, should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again.").setPadding(0, dp(12), 0, 0)
         val samples = SAMPLES.map { text ->
             body(text).apply {
                 visibility = View.GONE
                 setPadding(dp(12), dp(8), dp(12), dp(8))
             }
         }
+        // A picture of text: invisible to the text reader, so only screen capture can catch it.
+        val sampleImage = android.widget.ImageView(this).apply {
+            setImageBitmap(textAsPicture("Your account has been suspended.", "Verify your identity to claim your refund."))
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
+            adjustViewBounds = true
+        }
+        column.addView(sampleImage)
         lateinit var sampleButton: Button
         sampleButton = button("Show sample text") {
             val show = samples[0].visibility != View.VISIBLE
             samples.forEach { it.visibility = if (show) View.VISIBLE else View.GONE }
+            sampleImage.visibility = if (show) View.VISIBLE else View.GONE
             sampleButton.text = if (show) "Hide sample text" else "Show sample text"
         }
         // Lets automated tests reveal the sample without tapping.
@@ -120,6 +134,19 @@ class MainActivity : Activity() {
         refresh()
     }
 
+    private fun textAsPicture(vararg lines: String): android.graphics.Bitmap {
+        val bitmap = android.graphics.Bitmap.createBitmap(dp(320), dp(36) * lines.size + dp(16),
+            android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(0xFFFFF4D6.toInt())
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF202020.toInt()
+            textSize = dp(15).toFloat()
+        }
+        lines.forEachIndexed { i, line -> canvas.drawText(line, dp(10).toFloat(), (dp(36) * (i + 1)).toFloat(), paint) }
+        return bitmap
+    }
+
     private fun flagsEnabled(): Boolean {
         val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
         val me = ComponentName(this, ContentFlagService::class.java)
@@ -131,7 +158,7 @@ class MainActivity : Activity() {
         flagsStatus.text = if (on && !ContentFlagService.connected) {
             "Enabled in settings but not running yet. If this does not change, turn it off and on again in accessibility settings."
         } else if (on) {
-            "On. Scam-style, adult and highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
+            "On. Scam-style, adult, engagement-bait and highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
         } else {
             "Off. When on, the app reads text shown in other apps to score it."
         }
@@ -149,9 +176,9 @@ class MainActivity : Activity() {
             .setTitle("Orbit will read text on your screen")
             .setMessage(
                 "To flag content, Orbit Content Flags uses Android's Accessibility API to read the text " +
-                    "shown on screen in other apps.\n\n" +
-                    "• The text is scored on this device and then discarded.\n" +
-                    "• It is never stored, shared or sent anywhere.\n" +
+                    "shown on screen in other apps, and to capture the screen so it can read text inside images.\n\n" +
+                    "• Text and captures are analysed on this device and then discarded.\n" +
+                    "• They are never stored, shared or sent anywhere.\n" +
                     "• Password fields and text you type are skipped.\n" +
                     "• The app does not tap, type or take any action for you.\n\n" +
                     "You can turn this off at any time in Settings > Accessibility."

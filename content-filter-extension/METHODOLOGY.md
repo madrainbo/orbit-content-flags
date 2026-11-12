@@ -1,4 +1,4 @@
-# Methodology (v0.5)
+# Methodology (v0.6)
 
 Published so the thresholds can be criticised. Every number here is a starting choice, not a validated benchmark. The code is in `core/scoring.js`, `core/labels.js` and `content.js`; the phrase patterns are in `shared/patterns.json`, from which the JavaScript and Kotlin tables are generated.
 
@@ -27,16 +27,17 @@ The lexicon is about 50 English stems in three groups (outrage, fear, bait). It 
 
 **What a tier does not mean:** that the text is false, manipulative or low quality. Accurate reporting on a disaster will often score high. Known false positives include sports ("slam dunk") and quoted speech.
 
-## Scam-style and adult wording
+## Scam-style, adult and engagement-bait wording
 
-Each passage is checked against two lists of phrase patterns in `shared/patterns.json`. Every pattern has a weight of 1 or 2, and a passage is flagged when the weights of the distinct patterns it matches add up to **2 or more**. So one strong phrase is enough ("claim your prize", "verify your account"), while a weak one on its own is not ("congratulations", "act now", "nude").
+Each passage is checked against three lists of phrase patterns in `shared/patterns.json`. Every pattern has a weight of 1 or 2, and a passage is flagged when the weights of the distinct patterns it matches add up to **2 or more**. So one strong phrase is enough ("claim your prize", "verify your account"), while a weak one on its own is not ("congratulations", "act now", "nude").
 
 | Kind | Patterns | Examples of weight 2 | Examples of weight 1 |
 |---|---|---|---|
-| Scam-style | 30 | "you've won", "account has been suspended", "double your bitcoin", "pay with gift cards" | "congratulations", "act now", "wire transfer", "work from home" |
-| Adult | 14 | explicit site and content terms | "18+", "adults only", "nude" |
+| Scam-style | 45 | "you've won", "account has been suspended", "double your bitcoin", "pay with gift cards" | "congratulations", "act now", "wire transfer", "work from home" |
+| Adult | 23 | explicit site and content terms, the 18+ emoji | "18+", "adults only", "nude" |
+| Engagement bait | 22 | "share before it gets deleted", "one weird trick", "stop scrolling" | "follow for more", "link in bio", "tag a friend" |
 
-If a passage qualifies for more than one kind, adult wins over scam-style, which wins over high emotional charge. The reason shown for scam-style passages quotes up to two matched phrases; the reason for adult passages never repeats the matched words.
+If a passage qualifies for more than one kind, the order is adult, scam-style, high emotional charge, engagement bait. The reason shown for scam-style passages quotes up to two matched phrases; the reason for adult passages never repeats the matched words.
 
 **What these do not mean:** that a message is fraudulent or that content is explicit. The lists are English-only starting choices, not validated against labelled data. Legitimate security notices, real prize draws and job adverts use the same phrases; sexual-health and art writing can trigger the adult list. Images and video are never inspected.
 

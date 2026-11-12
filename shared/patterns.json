@@ -2,52 +2,370 @@
   "_comment": "Single source for wording patterns. Regexes use only syntax shared by JavaScript and Java, and are matched case-insensitively. Run `node content-filter-extension/test/gen-patterns.js --write` after editing. A passage is flagged when the weights of its distinct matching patterns add up to the threshold.",
   "threshold": 2,
   "scam": [
-    { "re": "\\byou(?:'ve| have)? (?:just )?won\\b", "w": 2 },
-    { "re": "\\bclaim (?:your|the|my) (?:prize|reward|gift|winnings|bonus|refund)\\b", "w": 2 },
-    { "re": "\\b(?:you have|you've|you were|you are) been (?:selected|chosen)\\b", "w": 1 },
-    { "re": "\\bcongratulations\\b", "w": 1 },
-    { "re": "\\b(?:verify|confirm|update|validate) your (?:account|identity|payment|billing|bank|card|password|details)\\b", "w": 2 },
-    { "re": "\\baccount (?:has been|is|was|will be) (?:suspended|locked|blocked|disabled|compromised|restricted|closed)\\b", "w": 2 },
-    { "re": "\\b(?:unusual|suspicious) (?:activity|sign-in|login|transaction)\\b", "w": 1 },
-    { "re": "\\b(?:urgent|immediate) action (?:is )?(?:required|needed)\\b", "w": 1 },
-    { "re": "\\bfinal (?:notice|warning|reminder)\\b", "w": 1 },
-    { "re": "\\bclick (?:here|the link|this link|below) to (?:claim|verify|confirm|unlock|receive|restore)\\b", "w": 2 },
-    { "re": "\\b(?:guaranteed|risk[- ]free) (?:returns?|profits?|income|earnings|investment|winnings)\\b", "w": 2 },
-    { "re": "\\bdouble your (?:money|bitcoin|crypto|investment|deposit)\\b", "w": 2 },
-    { "re": "\\b(?:earn|make) (?:up to )?[$£€]\\s?\\d[\\d,]*k? ?(?:per|a|an|every|each|/) ?(?:day|week|hour|month)\\b", "w": 2 },
-    { "re": "\\b(?:crypto|bitcoin|btc|eth|usdt) giveaway\\b", "w": 2 },
-    { "re": "\\bsend (?:me |us )?(?:\\d[\\d.,]* )?(?:btc|bitcoin|eth|usdt|crypto)\\b", "w": 2 },
-    { "re": "\\b(?:pay|payment) (?:with|by|in|using|via) gift cards?\\b", "w": 2 },
-    { "re": "\\b(?:buy|purchase|send) (?:\\w+ )?gift cards?\\b", "w": 1 },
-    { "re": "\\bwire transfer\\b", "w": 1 },
-    { "re": "\\bfree (?:iphone|gift card|money|cash|crypto|bitcoin)\\b", "w": 1 },
-    { "re": "\\bno experience (?:needed|required|necessary)\\b", "w": 1 },
-    { "re": "\\bwork from home\\b", "w": 1 },
-    { "re": "\\b100% (?:free|guaranteed|safe|legit)\\b", "w": 1 },
-    { "re": "\\bact (?:now|fast|immediately)\\b", "w": 1 },
-    { "re": "\\b(?:limited|exclusive)[- ](?:time )?(?:offer|deal|slots?|spots?)\\b", "w": 1 },
-    { "re": "\\b(?:dm|message|text|whatsapp|telegram) (?:me|us) (?:now |today )?(?:to|for) \\w+", "w": 1 },
-    { "re": "\\b(?:loan|credit) (?:is |has been )?(?:pre-?approved|approved instantly)\\b", "w": 1 },
-    { "re": "\\b(?:parcel|package|delivery) (?:is |has been )?(?:on hold|held|pending|undeliverable|could not be delivered)\\b", "w": 1 },
-    { "re": "\\b(?:small|customs|redelivery|processing|release) fee\\b", "w": 1 },
-    { "re": "\\binvestment opportunity\\b", "w": 1 },
-    { "re": "\\bget rich\\b", "w": 1 }
+    {
+      "re": "\\byou(?:'ve| have)? (?:just )?won\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bclaim (?:your|the|my) (?:prize|reward|gift|winnings|bonus|refund)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:you have|you've|you were|you are) been (?:selected|chosen)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bcongratulations\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:verify|confirm|update|validate) your (?:account|identity|payment|billing|bank|card|password|details)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\baccount (?:has been|is|was|will be) (?:suspended|locked|blocked|disabled|compromised|restricted|closed)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:unusual|suspicious) (?:activity|sign-in|login|transaction)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:urgent|immediate) action (?:is )?(?:required|needed)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bfinal (?:notice|warning|reminder)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bclick (?:here|the link|this link|below) to (?:claim|verify|confirm|unlock|receive|restore)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:guaranteed|risk[- ]free) (?:returns?|profits?|income|earnings|investment|winnings)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bdouble your (?:money|bitcoin|crypto|investment|deposit)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:earn|make) (?:up to )?[$£€]\\s?\\d[\\d,]*k? ?(?:per|a|an|every|each|/) ?(?:day|week|hour|month)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:crypto|bitcoin|btc|eth|usdt) giveaway\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bsend (?:me |us )?(?:\\d[\\d.,]* )?(?:btc|bitcoin|eth|usdt|crypto)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:pay|payment) (?:with|by|in|using|via) gift cards?\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:buy|purchase|send) (?:\\w+ )?gift cards?\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bwire transfer\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bfree (?:iphone|gift card|money|cash|crypto|bitcoin)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bno experience (?:needed|required|necessary)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bwork from home\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b100% (?:free|guaranteed|safe|legit)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bact (?:now|fast|immediately)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:limited|exclusive)[- ](?:time )?(?:offer|deal|slots?|spots?)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:dm|message|text|whatsapp|telegram) (?:me|us) (?:now |today )?(?:to|for) \\w+",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:loan|credit) (?:is |has been )?(?:pre-?approved|approved instantly)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:parcel|package|delivery) (?:is |has been )?(?:on hold|held|pending|undeliverable|could not be delivered)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:small|customs|redelivery|processing|release) fee\\b",
+      "w": 1
+    },
+    {
+      "re": "\\binvestment opportunity\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bget rich\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:recover|recovery of|retrieve) (?:your |my |their )?(?:lost |stolen |hacked )?(?:funds|crypto|bitcoin|money|account)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bsugar (?:daddy|daddies|momma|mommy|mummy|baby)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:forex|binary options?|crypto) (?:signals?|trading group|trader|mentor|expert)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:made|earned|turned|flipped) [$£€]\\s?\\d[\\d,.]*k? (?:in|into|within) ",
+      "w": 2
+    },
+    {
+      "re": "\\blink in (?:my )?bio to (?:claim|earn|invest|join|start|get paid)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bfree (?:robux|v-?bucks|followers|likes|diamonds|uc|skins)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:cash ?app|venmo|zelle|paypal) (?:me|flip|blessing|giveaway)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bpassive income\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:financial freedom|quit (?:my|your) (?:job|9[- ]?(?:to[- ]?)?5))\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bgiveaway\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bairdrop\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:whatsapp|telegram)\\b.{0,12}\\+?\\d{6,}",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:inbox|dm|message) (?:me|us)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\binvest(?:ed|ing)? (?:with|through) (?:him|her|them|me|us)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bchanged my life\\b",
+      "w": 1
+    }
   ],
   "adult": [
-    { "re": "\\bporn\\w*", "w": 2 },
-    { "re": "\\bxxx\\b", "w": 2 },
-    { "re": "\\bnsfw\\b", "w": 2 },
-    { "re": "\\bonlyfans\\b", "w": 2 },
-    { "re": "\\bhentai\\b", "w": 2 },
-    { "re": "\\bnudes\\b", "w": 2 },
-    { "re": "\\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b", "w": 2 },
-    { "re": "\\b(?:cam ?girls?|live cams?|escorts?)\\b", "w": 2 },
-    { "re": "\\bhot (?:singles|girls|babes|milfs?)\\b", "w": 2 },
-    { "re": "\\bexplicit (?:content|photos|videos|images)\\b", "w": 2 },
-    { "re": "\\b(?:nude|naked|topless)\\b", "w": 1 },
-    { "re": "\\b(?:18\\+|adults only|over 18 only)", "w": 1 },
-    { "re": "\\b(?:sexy|horny|hookups?|sexting|uncensored)\\b", "w": 1 },
-    { "re": "\\berotic\\w*", "w": 1 }
+    {
+      "re": "\\bporn\\w*",
+      "w": 2
+    },
+    {
+      "re": "\\bxxx\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bnsfw\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bonlyfans\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bhentai\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bnudes\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:cam ?girls?|live cams?|escorts?)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bhot (?:singles|girls|babes|milfs?)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bexplicit (?:content|photos|videos|images)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:nude|naked|topless)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:18\\+|adults only|over 18 only)",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:sexy|horny|hookups?|sexting|uncensored)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\berotic\\w*",
+      "w": 1
+    },
+    {
+      "re": "🔞",
+      "w": 2
+    },
+    {
+      "re": "(?:🍑|🍆|💦|👅).{0,24}(?:🍑|🍆|💦|👅)",
+      "w": 1
+    },
+    {
+      "re": "\\bspicy (?:content|pics|photos|videos|link|page|account)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bp[o0]rn\\w*",
+      "w": 2
+    },
+    {
+      "re": "\\bn[u*]d[e3]s\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bs[e3]xting\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:strip|lap) ?(?:tease|dance|club)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:fetish|kinky|bdsm|lewd|thirst trap)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\blingerie\\b",
+      "w": 1
+    }
+  ],
+  "hook": [
+    {
+      "re": "\\bshare (?:this )?before (?:it'?s|it gets|they) (?:deleted?|taken down|removed?|banned)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:they|the media|doctors|banks|the government) (?:don'?t|do not|doesn'?t) want you to (?:know|see|hear)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bone (?:weird|simple|easy) trick\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:doctors|dentists|banks|experts) hate\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:stop|don'?t) scrolling\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bcomment [\"“']?\\w+[\"”']? (?:and|to|for|below and) ",
+      "w": 2
+    },
+    {
+      "re": "\\b9\\d ?% (?:of people |of you )?(?:can'?t|cannot|fail|won'?t|will fail|get this wrong)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\b(?:number|#) ?\\d+ will (?:shock|surprise|amaze|blow)\\b",
+      "w": 2
+    },
+    {
+      "re": "\\bnobody (?:is talking about|tells you|talks about)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:watch|wait) (?:till|until|to|for) the end\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bwait for it\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bfollow (?:me |us )?for more\\b",
+      "w": 1
+    },
+    {
+      "re": "\\blike (?:and|&|,) (?:share|subscribe|follow|comment)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\btag (?:a|\\d|your|some) (?:friends?|someone|people)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bdouble tap\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bsave this (?:post|video|reel|for later)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\blink in (?:my |the )?bio\\b",
+      "w": 1
+    },
+    {
+      "re": "\\b(?:gone wrong|not clickbait|you need to see this|must watch)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bthis (?:will|is going to) (?:change your life|blow your mind|shock you)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bthe (?:real )?(?:secret|truth) (?:to|of|about|behind|they)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bonly (?:geniuses|legends|real ones|1%|smart people)\\b",
+      "w": 1
+    },
+    {
+      "re": "\\bwhat happens next\\b",
+      "w": 1
+    }
   ],
   "aiLabel": "^(?:ai[- ]generated|ai[- ]generated content|ai info|made with ai|created with ai|generated (?:with|by) ai|imagined with ai|creator labell?ed as ai-generated|altered or synthetic content|contains ai-generated (?:content|media)|synthetic media|ai-generated image|ai-generated video)\\.?$"
 }

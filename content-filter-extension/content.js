@@ -20,7 +20,7 @@
   const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Scam and adult', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
   const state = {
-    counts: { charge: 0, scam: 0, adult: 0, medium: 0 },
+    counts: { charge: 0, scam: 0, adult: 0, hook: 0, medium: 0 },
     hidden: 0, scanned: 0, images: 0, aiLabels: 0, signals: new Map(),
   };
   let host = null;
@@ -81,7 +81,7 @@
     state.hidden += 1;
   }
 
-  const CHIP_TEXT = { charge: 'high charge', scam: 'scam-style', adult: 'adult', medium: 'charged' };
+  const CHIP_TEXT = { charge: 'high charge', scam: 'scam-style', adult: 'adult', hook: 'bait', medium: 'charged' };
 
   // f: { kind, reason } where kind is charge, scam, adult or medium.
   function flag(el, f) {
@@ -275,7 +275,7 @@
   function renderPanel() {
     if (dismissed) return;
     const n = state.counts;
-    const total = n.charge + n.scam + n.adult + n.medium + state.signals.size;
+    const total = n.charge + n.scam + n.adult + n.hook + n.medium + state.signals.size;
     if (!total) { if (host) host.remove(); host = null; return; }
     if (!host) {
       host = document.createElement('div');
@@ -330,6 +330,7 @@
     };
     count('Scam and adult', 'scam', 'scam-style');
     count('Scam and adult', 'adult', 'adult-content');
+    count('Scam and adult', 'hook', 'engagement-bait');
     count('Emotional charge', 'charge', 'high-charge');
     count('Emotional charge', 'medium', 'medium-charge');
     for (const s of state.signals.values()) byGroup.get(s.group).push(s);

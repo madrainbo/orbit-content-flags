@@ -2,5 +2,5 @@
 <resources>
     <string name="app_name">Orbit Content Flags</string>
     <string name="flags_service_label">Orbit on-screen flags</string>
-    <string name="flags_service_description">Reads the text shown on screen in other apps and scores it on this device for emotionally charged wording and pressure-selling phrases. Nothing it reads is stored or sent anywhere. Password fields and text you type are skipped.</string>
+    <string name="flags_service_description">Reads the text shown on screen in other apps, and can capture the screen to read text inside images, then checks it on this device for scam-style, adult, engagement-bait and emotionally charged wording. Nothing it reads or captures is stored or sent anywhere. Password fields and text you type are skipped.</string>
 </resources>

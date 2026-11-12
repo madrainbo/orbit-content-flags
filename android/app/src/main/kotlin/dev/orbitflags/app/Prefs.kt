@@ -20,6 +20,14 @@ object Prefs {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("hide_flagged", value).apply()
     }
 
+    /** Whether the screen is captured to read text inside images (default on). */
+    fun readImages(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("read_images", true)
+
+    fun setReadImages(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("read_images", value).apply()
+    }
+
     fun save(context: Context, block: List<String>, allow: List<String>) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString("block", block.joinToString("\n"))

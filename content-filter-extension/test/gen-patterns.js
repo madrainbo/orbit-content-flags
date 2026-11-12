@@ -11,7 +11,7 @@ const KT_OUT = path.resolve(__dirname, '../../android/core/src/main/kotlin/dev/o
 
 function render() {
   const p = JSON.parse(fs.readFileSync(SRC, 'utf8'));
-  for (const list of [p.scam, p.adult]) for (const e of list) new RegExp(e.re, 'i'); // must compile
+  for (const list of [p.scam, p.adult, p.hook]) for (const e of list) new RegExp(e.re, 'i'); // must compile
   new RegExp(p.aiLabel, 'i');
 
   const jsList = (list) => list.map((e) => `    [${JSON.stringify(e.re)}, ${e.w}],`).join('\n');
@@ -26,6 +26,9 @@ ${jsList(p.scam)}
     ]),
     ADULT: compile([
 ${jsList(p.adult)}
+    ]),
+    HOOK: compile([
+${jsList(p.hook)}
     ]),
     AI_LABEL: new RegExp(${JSON.stringify(p.aiLabel)}, 'i'),
   };
@@ -52,6 +55,10 @@ ${ktList(p.scam)}
 
     val ADULT = listOf(
 ${ktList(p.adult)}
+    )
+
+    val HOOK = listOf(
+${ktList(p.hook)}
     )
 
     val AI_LABEL = Regex(${kt(p.aiLabel)}, RegexOption.IGNORE_CASE)

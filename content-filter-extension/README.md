@@ -1,4 +1,4 @@
-# Orbit Content Flags (Chrome extension, v0.5)
+# Orbit Content Flags (Chrome extension, v0.6)
 
 Flags emotionally charged text, declared AI and fact-check labels, and draining design patterns as you browse, and warns or blocks on domains you list. Same stance as orbit-check: **signals, not verdicts**, with thresholds published in [METHODOLOGY.md](METHODOLOGY.md).
 
@@ -7,7 +7,7 @@ Everything is scored on the device and page content is never sent anywhere. By d
 ## What it does
 
 - **Emotional charge:** headings and paragraphs that score "high" are hidden behind a one-line notice that says why (for example "fear and outrage wording") with a **Show** button. Once shown, the passage carries a label with the detail; click the label to dispute and remove it. "Medium" passages can optionally be labelled.
-- **Scam-style and adult wording:** passages that read like a scam hook ("claim your prize", "verify your account", "guaranteed returns") or like adult content are hidden the same way, each with its own reason.
+- **Scam-style and adult wording:** passages that read like a scam hook ("claim your prize", "verify your account", "guaranteed returns") like engagement bait ("share before it gets deleted", "doctors hate this one weird trick") or like adult content are hidden the same way, each with its own reason.
 - **"AI-generated" badges:** when a site shows its own AI label on a post (for example "AI info" or "Creator labeled as AI-generated"), the post is hidden and listed in the panel.
 - **Declared labels:** reads labels that already exist rather than guessing. Images whose metadata declares them AI-generated (IPTC Digital Source Type) are hidden the same way; fact-check markup (schema.org ClaimReview), publisher-declared opinion, satire and advertiser content, and `rel="sponsored"` links are listed in the page panel.
 - **Claim lookup (opt-in):** if you save a Google Fact Check Tools API key in settings, selecting text and choosing "Check this claim" from the right-click menu sends only that selected text to Google and lists any published fact-checks. Without a key the menu item does not exist.
@@ -30,7 +30,7 @@ node --test test/core.test.js   # scoring and domain rules, no dependencies
 node test/e2e.js                # real Chromium with the extension loaded; needs Playwright
 ```
 
-## Limits in v0.5
+## Limits in v0.6
 
 - English only; the emotion scorer is a word-list heuristic that has not been validated against labelled data. Because flagged content is now hidden by default, its false positives hide things: accurate reporting on a disaster will often be covered until you press Show.
 - 300 domains per list (browser sync storage allows 8 KB per item).

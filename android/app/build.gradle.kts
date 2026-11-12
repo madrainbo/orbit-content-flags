@@ -9,8 +9,8 @@ android {
         applicationId = "dev.orbitflags.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.4.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,4 +20,6 @@ android {
 }
 dependencies {
     implementation(project(":core"))
+    // On-device text recognition with a bundled model (no model download).
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }

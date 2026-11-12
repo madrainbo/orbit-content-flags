@@ -95,7 +95,7 @@ object Scoring {
         return counts.sortedByDescending { it.second }.take(2).joinToString(" and ") { it.first } + " wording"
     }
 
-    /** kind is "adult", "scam", "charge" or null when the passage is not flagged. */
+    /** kind is "adult", "scam", "charge", "hook" or null when the passage is not flagged. */
     data class Classification(val kind: String?, val reason: String, val emotion: Result)
 
     private fun matchPatterns(list: List<Patterns.Entry>, t: String): Pair<Int, List<String>> {
@@ -104,7 +104,7 @@ object Scoring {
         for (entry in list) {
             val m = entry.re.find(t) ?: continue
             weight += entry.w
-            matches.add(m.value.lowercase())
+            matches.add(m.value.lowercase().trim())
         }
         return weight to matches
     }
@@ -126,6 +126,11 @@ object Scoring {
         }
         if (emotion.tier == "high") {
             return Classification("charge", "high emotional charge (" + describeCategories(emotion.hits) + ")", emotion)
+        }
+        val (hookWeight, hookMatches) = matchPatterns(Patterns.HOOK, t)
+        if (hookWeight >= Patterns.THRESHOLD) {
+            val quoted = hookMatches.take(2).joinToString(", ") { "\u201c" + it.take(40) + "\u201d" }
+            return Classification("hook", "engagement-bait wording ($quoted)", emotion)
         }
         return Classification(null, "", emotion)
     }

@@ -109,13 +109,13 @@
     const matches = [];
     for (const { re, w } of list) {
       const m = t.match(re);
-      if (m) { weight += w; matches.push(m[0].toLowerCase()); }
+      if (m) { weight += w; matches.push(m[0].toLowerCase().trim()); }
     }
     return { weight, matches };
   }
 
   // Decides whether a passage should be flagged, and why. Adult wording wins
-  // over scam-style wording, which wins over high emotional charge.
+  // over scam-style wording, then high emotional charge, then engagement bait.
   function classify(text) {
     const t = String(text || '');
     const emotion = scoreEmotion(t);
@@ -129,6 +129,11 @@
     }
     if (emotion.tier === 'high') {
       return { kind: 'charge', reason: 'high emotional charge (' + describeCategories(emotion.hits) + ')', emotion };
+    }
+    const hook = matchPatterns(P.HOOK, t);
+    if (hook.weight >= P.THRESHOLD) {
+      const quoted = hook.matches.slice(0, 2).map((m) => '\u201c' + m.slice(0, 40) + '\u201d').join(', ');
+      return { kind: 'hook', reason: 'engagement-bait wording (' + quoted + ')', emotion };
     }
     return { kind: null, reason: '', emotion };
   }
