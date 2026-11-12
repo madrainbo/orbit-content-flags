@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- isAccessibilityTool is false: this app is not an assistive tool, so Play's
+<!-- All event types are requested so that browsers expose the full page, not
+     the cut-down view they give to form-filling services.
+     isAccessibilityTool is false: this app is not an assistive tool, so Play's
      prominent-disclosure and consent rules apply (see MainActivity). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewScrolled"
+    android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews"
     android:canRetrieveWindowContent="true"

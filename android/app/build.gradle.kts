@@ -9,8 +9,8 @@ android {
         applicationId = "dev.orbitflags.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.4.0"
+        versionCode = 6
+        versionName = "0.4.1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

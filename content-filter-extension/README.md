@@ -6,6 +6,7 @@ Everything is scored on the device and page content is never sent anywhere. By d
 
 ## What it does
 
+- **What is scanned:** headings, paragraphs and list items, plus any other block of text (sites such as Instagram and YouTube put post text in plain containers).
 - **Emotional charge:** headings and paragraphs that score "high" are hidden behind a one-line notice that says why (for example "fear and outrage wording") with a **Show** button. Once shown, the passage carries a label with the detail; click the label to dispute and remove it. "Medium" passages can optionally be labelled.
 - **Scam-style and adult wording:** passages that read like a scam hook ("claim your prize", "verify your account", "guaranteed returns") like engagement bait ("share before it gets deleted", "doctors hate this one weird trick") or like adult content are hidden the same way, each with its own reason.
 - **"AI-generated" badges:** when a site shows its own AI label on a post (for example "AI info" or "Creator labeled as AI-generated"), the post is hidden and listed in the panel.

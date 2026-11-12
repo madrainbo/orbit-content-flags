@@ -16,7 +16,9 @@
   const MAX_BLOCKS = 600;
   const MAX_IMAGES = 20;
   const MAX_AI_LABELS = 20;
-  const SELECTOR = 'h1, h2, h3, p, [role="heading"]';
+  const SELECTOR = 'h1, h2, h3, h4, p, li, blockquote, [role="heading"]';
+  const SKIP_TEXT = 'script, style, noscript, textarea, select, option, [contenteditable="true"], ' +
+    '.ocf-chip, .ocf-cover, #ocf-panel-host';
   const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Scam and adult', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
   const state = {
@@ -115,15 +117,40 @@
     }
   }
 
+  // Sites such as Instagram and YouTube put post text in plain div and span
+  // elements, so besides headings and paragraphs, find the nearest block-level
+  // element around any run of text.
+  function textBlocks(root) {
+    const found = new Set();
+    if (!root.isConnected) return found;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    let budget = 4000;
+    while ((node = walker.nextNode()) && budget-- > 0) {
+      if (node.nodeValue.trim().length < 12) continue;
+      let el = node.parentElement;
+      if (!el || el.closest(SKIP_TEXT)) continue;
+      for (let hops = 0; hops < 3 && el.parentElement && el !== document.body; hops++) {
+        if (!getComputedStyle(el).display.startsWith('inline')) break;
+        el = el.parentElement;
+      }
+      if (el === document.body || el.closest(SELECTOR)) continue; // headings and paragraphs are scanned whole
+      if (el.querySelectorAll('*').length > 25) continue;         // a container, not a passage
+      found.add(el);
+    }
+    return found;
+  }
+
   function scan(root) {
     const nodes = root.matches && root.matches(SELECTOR) ? [root] : [];
     if (root.querySelectorAll) nodes.push(...root.querySelectorAll(SELECTOR));
+    nodes.push(...textBlocks(root));
     for (const el of nodes) {
       if (state.scanned >= MAX_BLOCKS) break;
       if (seen.has(el) || el.closest('.ocf-chip, .ocf-cover') || el.querySelector('.ocf-cover')) continue;
       seen.add(el);
       const text = (el.innerText || '').trim().slice(0, 2000);
-      if (text.length < 20) continue;
+      if (text.length < 12) continue;
       state.scanned += 1;
       const c = classify(text);
       if (c.kind) {

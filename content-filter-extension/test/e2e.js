@@ -46,6 +46,8 @@ const PAGE = `<!doctype html><title>t</title>
 <p>Hurry! Only 3 left in stock.</p>
 <p id="scam">Congratulations! You have been selected. Click here to claim your prize.</p>
 <p id="adult">Hot singles in your area want to chat. 18+ only, uncensored live cams.</p>
+<div id="divscam"><span>Free robux giveaway, </span><span>link in bio to claim</span></div>
+<div id="divplain"><span>Beach day with the family, </span><span>photos coming soon</span></div>
 <p id="prose">Experts say AI-generated images are getting harder to spot.</p>
 <article id="post"><span>AI info</span><div>A perfectly ordinary looking photo caption.</div></article>
 <video autoplay muted></video>`;
@@ -98,11 +100,15 @@ const PAGE = `<!doctype html><title>t</title>
     assert.equal(await page.locator('#post').evaluate((p) => p.previousElementSibling.textContent),
       'Hidden: post labelled AI-generated.Show');
     assert.ok(await page.locator('#prose').isVisible());
-    for (const id of ['scam', 'adult', 'post']) {
+    // Text in plain div and span elements, as social sites use, is scanned too.
+    assert.ok(await page.locator('#divscam').isHidden(), 'scam text in a div is hidden');
+    assert.ok(await page.locator('#divplain').isVisible());
+    for (const id of ['scam', 'adult', 'post', 'divscam']) {
       await page.locator('#' + id).evaluate((p) => p.previousElementSibling.querySelector('button').click());
       assert.ok(await page.locator('#' + id).isVisible(), id + ' is restored by Show');
     }
-    assert.equal(await page.locator('.ocf-chip').count(), 2, 'scam and adult labels appear once shown');
+    assert.equal(await page.locator('.ocf-chip').count(), 3, 'scam and adult labels appear once shown');
+    await page.locator('#divscam .ocf-chip').click();
     await page.locator('#scam .ocf-chip').click();
     await page.locator('#adult .ocf-chip').click();
     await page.locator('h1').evaluate((h) => h.previousElementSibling.querySelector('button').click());
@@ -138,7 +144,7 @@ const PAGE = `<!doctype html><title>t</title>
     // 3. Save lists through the options page.
     const opts = await ctx.newPage();
     await opts.goto(`chrome-extension://${extId}/options.html`);
-    await opts.waitForFunction(() => /disputed 3 flags/.test(document.getElementById('disputes').textContent));
+    await opts.waitForFunction(() => /disputed 4 flags/.test(document.getElementById('disputes').textContent));
     await opts.fill('#warn', 'warned.test');
     await opts.fill('#block', 'https://www.blocked.test/x');
     await opts.click('#save');
