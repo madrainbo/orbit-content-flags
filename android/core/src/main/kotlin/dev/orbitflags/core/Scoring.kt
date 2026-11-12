@@ -84,6 +84,17 @@ object Scoring {
         return Result(tier, score, tokens.size, hits, capsRatio, exclaimRate)
     }
 
+    private val CATEGORY_NAMES = linkedMapOf("outrage" to "outrage", "fear" to "fear", "bait" to "clickbait")
+
+    /** Plain-language reason for a flag, e.g. "fear and outrage wording". */
+    fun describeCategories(hits: List<Hit>): String {
+        val counts = CATEGORY_NAMES.map { (category, name) -> name to hits.count { it.category == category } }
+            .filter { it.second > 0 }
+        if (counts.isEmpty()) return "capitals and exclamation marks"
+        // Stable sort: ties keep outrage, fear, clickbait order.
+        return counts.sortedByDescending { it.second }.take(2).joinToString(" and ") { it.first } + " wording"
+    }
+
     private val URGENCY = listOf(
         "low-stock" to Regex("\\bonly\\s+\\d+\\s+(?:left|remaining)\\b", RegexOption.IGNORE_CASE),
         "activity-notice" to Regex(

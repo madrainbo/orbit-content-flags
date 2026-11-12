@@ -3,7 +3,7 @@ const { buildRules, inList, normalizeDomain } = self.OCFDomains;
 
 const DEFAULTS = {
   lists_block: [], lists_warn: [], lists_allow: [],
-  settings: { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true },
+  settings: { enabled: true, showMedium: false, readImageLabels: true },
 };
 
 async function readLists() {

@@ -23,6 +23,8 @@ Score = sum of weighted components, 0 to 100.
 
 The lexicon is about 50 English stems in three groups (outrage, fear, bait). It is motivated by the finding that moral-emotional words increase sharing (Brady et al., PNAS 2017, doi:10.1073/pnas.1618923114), but it is our own short list, not that paper's dictionary.
 
+**What happens to a `high` passage:** by default it is hidden behind a notice with a Show button; settings can change this to blur or label only. `medium` passages are never hidden.
+
 **What a tier does not mean:** that the text is false, manipulative or low quality. Accurate reporting on a disaster will often score high. Known false positives include sports ("slam dunk") and quoted speech.
 
 ## Draining design

@@ -74,6 +74,15 @@ const PAGE = `<!doctype html><title>t</title>
     // 1. Flags on a plain page.
     const page = await ctx.newPage();
     await page.goto(`http://plain.test:${port}/`);
+    // Flagged content is hidden by default behind a notice with a Show button.
+    await page.waitForSelector('.ocf-cover');
+    assert.ok(await page.locator('h1').isHidden(), 'charged heading is hidden');
+    assert.ok(await page.locator('p').first().isVisible(), 'neutral text is untouched');
+    assert.match(await page.locator('h1').evaluate((h) => h.previousElementSibling.textContent),
+      /^Hidden: high emotional charge \(.* wording\)\.Show$/);
+    assert.equal(await page.locator('.ocf-chip').count(), 0, 'no label until shown');
+    await page.locator('h1').evaluate((h) => h.previousElementSibling.querySelector('button').click());
+    assert.ok(await page.locator('h1').isVisible(), 'Show restores the heading');
     await page.waitForSelector('.ocf-chip.ocf-high');
     assert.equal(await page.locator('.ocf-chip').count(), 1, 'only the charged heading is flagged');
     const panel = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
@@ -82,8 +91,16 @@ const PAGE = `<!doctype html><title>t</title>
     assert.match(panel, /Autoplay video/);
 
     // 1b. Declared labels: AI image metadata, fact-check markup, sponsored links.
-    await page.waitForSelector('#ai.ocf-img-flag');
+    await page.waitForSelector('#ai.ocf-img-flag', { state: 'attached' });
     assert.equal(await page.locator('.ocf-img-flag').count(), 1, 'the plain image is not flagged');
+    assert.ok(await page.locator('#ai').isHidden(), 'declared-AI image is hidden');
+    assert.ok(await page.locator('#plain').isVisible());
+    const before = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
+    assert.match(before, /Show all hidden \(1\)/);
+    await page.locator('#ocf-panel-host').evaluate((h) =>
+      [...h.shadowRoot.querySelectorAll('button')].find((b) => /Show all/.test(b.textContent)).click());
+    assert.ok(await page.locator('#ai').isVisible(), 'Show all restores the image');
+    assert.equal(await page.locator('.ocf-cover').count(), 0);
     const labels = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
     assert.match(labels, /Declared AI-generated image/);
     assert.match(labels, /The moon is made of cheese.*Rated .False. by Example Checks/);

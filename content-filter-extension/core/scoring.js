@@ -89,7 +89,19 @@
     return out;
   }
 
-  const api = { scoreEmotion, urgencySignals, THRESHOLDS, LEXICON };
+  // Plain-language reason for a flag, e.g. "fear and outrage wording".
+  const CATEGORY_NAMES = { outrage: 'outrage', fear: 'fear', bait: 'clickbait' };
+  function describeCategories(hits) {
+    const counts = Object.keys(CATEGORY_NAMES).map((c) => ({
+      name: CATEGORY_NAMES[c],
+      n: (hits || []).filter((h) => h.category === c).length,
+    })).filter((c) => c.n > 0);
+    if (!counts.length) return 'capitals and exclamation marks';
+    counts.sort((a, b) => b.n - a.n); // stable: ties keep outrage, fear, clickbait order
+    return counts.slice(0, 2).map((c) => c.name).join(' and ') + ' wording';
+  }
+
+  const api = { scoreEmotion, urgencySignals, describeCategories, THRESHOLDS, LEXICON };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OCFScoring = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

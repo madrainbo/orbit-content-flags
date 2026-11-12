@@ -4,7 +4,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { scoreEmotion, urgencySignals } = require('../core/scoring.js');
+const { scoreEmotion, urgencySignals, describeCategories } = require('../core/scoring.js');
 
 const FILE = path.resolve(__dirname, '../../shared/scoring-vectors.tsv');
 const TEXTS = [
@@ -27,7 +27,8 @@ const TEXTS = [
 function render() {
   return TEXTS.map((t) => {
     const r = scoreEmotion(t);
-    return [r.tier, r.score, r.hits.length, urgencySignals(t).map((s) => s.id).join(','), t].join('\t');
+    return [r.tier, r.score, r.hits.length, urgencySignals(t).map((s) => s.id).join(','),
+      describeCategories(r.hits), t].join('\t');
   }).join('\n') + '\n';
 }
 

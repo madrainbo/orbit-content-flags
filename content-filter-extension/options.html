@@ -30,7 +30,13 @@
   <h2>Flags</h2>
   <label class="check"><input type="checkbox" id="enabled"> Enable flags and domain lists</label>
   <label class="check"><input type="checkbox" id="showMedium"> Also label medium emotional charge</label>
-  <label class="check"><input type="checkbox" id="blurHigh"> Blur high-charge text until I hover over it</label>
+  <label class="check">Flagged content (high-charge text, images declared AI-generated):
+    <select id="highAction">
+      <option value="hide">Hide until I press Show</option>
+      <option value="blur">Blur until I hover over it</option>
+      <option value="label">Label only</option>
+    </select>
+  </label>
   <label class="check"><input type="checkbox" id="readImageLabels"> Read AI and Content Credentials labels from images (re-requests up to 20 images per page from their own sites, without cookies)</label>
 
   <h2>Claim lookup (optional)</h2>

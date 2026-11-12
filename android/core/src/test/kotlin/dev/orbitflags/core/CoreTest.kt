@@ -16,8 +16,11 @@ class ScoringTest {
         val lines = File("../../shared/scoring-vectors.tsv").readLines().filter { it.isNotBlank() }
         assertTrue(lines.size >= 10, "expected shared vectors")
         for (line in lines) {
-            val (tier, score, hits, urgency, text) = line.split('\t', limit = 5)
+            val cols = line.split('\t', limit = 6)
+            val (tier, score, hits, urgency, reason) = cols
+            val text = cols[5]
             val r = Scoring.scoreEmotion(text)
+            assertEquals(reason, Scoring.describeCategories(r.hits), text)
             assertEquals(tier, r.tier, text)
             assertEquals(score.toInt(), r.score, text)
             assertEquals(hits.toInt(), r.hits.size, text)

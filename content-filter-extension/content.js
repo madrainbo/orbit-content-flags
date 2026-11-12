@@ -3,10 +3,14 @@
 // anywhere; the only requests are re-reads of images already on the page.
 (async function () {
   'use strict';
-  const { scoreEmotion, urgencySignals } = globalThis.OCFScoring;
+  const { scoreEmotion, urgencySignals, describeCategories } = globalThis.OCFScoring;
   const { extractClaimReviews, extractIntent } = globalThis.OCFLabels;
   const stored = await chrome.storage.sync.get({ settings: {} });
-  const settings = { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true, ...stored.settings };
+  const settings = { enabled: true, showMedium: false, readImageLabels: true, ...stored.settings };
+  // What to do with flagged content: 'hide' (until Show is pressed), 'blur' or 'label'.
+  if (!['hide', 'blur', 'label'].includes(settings.highAction)) {
+    settings.highAction = settings.blurHigh ? 'blur' : 'hide';
+  }
   if (!settings.enabled) return;
 
   const MAX_BLOCKS = 600;
@@ -14,7 +18,7 @@
   const SELECTOR = 'h1, h2, h3, p, [role="heading"]';
   const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
-  const state = { high: 0, medium: 0, scanned: 0, images: 0, signals: new Map() };
+  const state = { high: 0, medium: 0, hidden: 0, scanned: 0, images: 0, signals: new Map() };
   let host = null;
   let dismissed = false;
 
@@ -57,6 +61,31 @@
     return parts.join('; ');
   }
 
+  // Replaces el with a one-line notice and a Show button. Nothing is removed
+  // from the page: pressing Show puts the element back exactly as it was.
+  function cover(el, reason, onShow) {
+    const box = document.createElement('div');
+    box.className = 'ocf-cover';
+    const text = document.createElement('span');
+    text.textContent = reason;
+    const show = document.createElement('button');
+    show.type = 'button';
+    show.textContent = 'Show';
+    show.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      box.remove();
+      el.classList.remove('ocf-hidden');
+      state.hidden -= 1;
+      if (onShow) onShow();
+      renderPanel();
+    });
+    box.append(text, show);
+    el.before(box);
+    el.classList.add('ocf-hidden');
+    state.hidden += 1;
+  }
+
   function flag(el, result) {
     const chip = document.createElement('span');
     chip.className = 'ocf-chip ocf-' + result.tier;
@@ -65,8 +94,7 @@
       '). Word-list heuristic, not a verdict. Click to dispute and remove.';
     chip.setAttribute('role', 'button');
     chip.tabIndex = 0;
-    const blurred = settings.blurHigh && result.tier === 'high';
-    if (blurred) el.classList.add('ocf-blur');
+    const action = result.tier === 'high' ? settings.highAction : 'label';
     const dispute = async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -79,7 +107,13 @@
     };
     chip.addEventListener('click', dispute);
     chip.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') dispute(e); });
-    el.appendChild(chip);
+    if (action === 'hide') {
+      cover(el, 'Hidden: high emotional charge (' + describeCategories(result.hits) + ').',
+        () => el.appendChild(chip));
+    } else {
+      if (action === 'blur') el.classList.add('ocf-blur');
+      el.appendChild(chip);
+    }
   }
 
   function scan(root) {
@@ -87,7 +121,7 @@
     if (root.querySelectorAll) nodes.push(...root.querySelectorAll(SELECTOR));
     for (const el of nodes) {
       if (state.scanned >= MAX_BLOCKS) break;
-      if (seen.has(el) || el.closest('.ocf-chip')) continue;
+      if (seen.has(el) || el.closest('.ocf-chip, .ocf-cover') || el.querySelector('.ocf-cover')) continue;
       seen.add(el);
       const text = (el.innerText || '').trim().slice(0, 2000);
       if (text.length < 20) continue;
@@ -112,6 +146,7 @@
     if (res.label) {
       img.classList.add('ocf-img-flag');
       img.title = res.label + ' (image metadata, unverified)' + (img.title ? ' · ' + img.title : '');
+      if (settings.highAction === 'hide') cover(img, 'Hidden: ' + res.label.toLowerCase() + ' image.');
       addSignal('Origin', 'img-' + url, res.label + ' image.',
         'Read from the file’s metadata; not verified.', img);
     } else if (res.hasContentCredentials) {
@@ -250,6 +285,15 @@
     close.addEventListener('click', () => { dismissed = true; host.remove(); host = null; });
     head.append(title, close);
     box.appendChild(head);
+    if (state.hidden > 0) {
+      const all = document.createElement('button');
+      all.className = 'show';
+      all.textContent = 'Show all hidden (' + state.hidden + ')';
+      all.addEventListener('click', () => {
+        document.querySelectorAll('.ocf-cover > button').forEach((b) => b.click());
+      });
+      box.appendChild(all);
+    }
 
     const byGroup = new Map(GROUPS.map((g) => [g, []]));
     if (state.high) byGroup.get('Emotional charge').push({ label: state.high + ' high-charge passage' + (state.high === 1 ? '' : 's') + '.' });
@@ -307,7 +351,8 @@
   new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const n of m.addedNodes) {
-        if (n.nodeType === 1 && n.id !== 'ocf-panel-host' && !n.classList.contains('ocf-chip')) pending.push(n);
+        if (n.nodeType === 1 && n.id !== 'ocf-panel-host' && !n.classList.contains('ocf-chip') &&
+            !n.classList.contains('ocf-cover')) pending.push(n);
       }
     }
     if (pending.length && !timer) {

@@ -73,8 +73,13 @@ class MainActivity : Activity() {
         heading("On-screen flags")
         flagsStatus = body("")
         flagsButton = button("Turn on on-screen flags") { showDisclosure() }
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Hide flagged text until I tap it"
+            isChecked = Prefs.hideFlagged(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
+        })
         body("Most screens produce no flag. To check it is working, show the sample below: " +
-            "a pill should appear near the bottom-right corner within a second.").setPadding(0, dp(12), 0, 0)
+            "the sample should be covered by a \"Hidden\" notice within a second, and tapping the notice shows it again.").setPadding(0, dp(12), 0, 0)
         val sample = body(SAMPLE_TEXT).apply {
             visibility = View.GONE
             setPadding(dp(12), dp(8), dp(12), dp(8))
@@ -124,7 +129,7 @@ class MainActivity : Activity() {
         flagsStatus.text = if (on && !ContentFlagService.connected) {
             "Enabled in settings but not running yet. If this does not change, turn it off and on again in accessibility settings."
         } else if (on) {
-            "On. A small pill appears over other apps when charged or pressure wording is on screen. Tap it to hide."
+            "On. Highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
         } else {
             "Off. When on, the app reads text shown in other apps to score it."
         }

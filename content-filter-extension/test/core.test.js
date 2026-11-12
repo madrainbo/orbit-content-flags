@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { scoreEmotion, urgencySignals } = require('../core/scoring.js');
+const { scoreEmotion, urgencySignals, describeCategories } = require('../core/scoring.js');
 const { normalizeDomain, parseList, inList, buildRules } = require('../core/domains.js');
 const { readImageLabels, extractClaimReviews, extractIntent, parseClaimSearch } = require('../core/labels.js');
 
@@ -141,4 +141,12 @@ test('shared scoring vectors are current', () => {
   const { FILE, render } = require('./vectors.js');
   assert.equal(require('node:fs').readFileSync(FILE, 'utf8'), render(),
     'run: node test/vectors.js --write');
+});
+
+test('describeCategories names the top two categories', () => {
+  const h = (category) => ({ term: 'x', category });
+  assert.equal(describeCategories([h('fear'), h('fear'), h('outrage'), h('bait')]), 'fear and outrage wording');
+  assert.equal(describeCategories([h('bait')]), 'clickbait wording');
+  assert.equal(describeCategories([h('fear'), h('outrage')]), 'outrage and fear wording');
+  assert.equal(describeCategories([]), 'capitals and exclamation marks');
 });

@@ -3,14 +3,16 @@
   const $ = (id) => document.getElementById(id);
   const DEFAULTS = {
     lists_block: [], lists_warn: [], lists_allow: [],
-    settings: { enabled: true, showMedium: false, blurHigh: false, readImageLabels: true },
+    settings: { enabled: true, showMedium: false, readImageLabels: true },
   };
   const LISTS = ['warn', 'block', 'allow'];
-  const FLAGS = ['enabled', 'showMedium', 'blurHigh', 'readImageLabels'];
+  const FLAGS = ['enabled', 'showMedium', 'readImageLabels'];
 
   const stored = await chrome.storage.sync.get(DEFAULTS);
   const settings = { ...DEFAULTS.settings, ...stored.settings };
   FLAGS.forEach((k) => { $(k).checked = settings[k]; });
+  $('highAction').value = ['hide', 'blur', 'label'].includes(settings.highAction)
+    ? settings.highAction : (settings.blurHigh ? 'blur' : 'hide');
   LISTS.forEach((k) => { $(k).value = stored['lists_' + k].join('\n'); });
 
   const { disputes = 0, factCheckKey = '' } = await chrome.storage.local.get(['disputes', 'factCheckKey']);
@@ -27,6 +29,7 @@
   $('save').addEventListener('click', async () => {
     const out = { settings: {} };
     FLAGS.forEach((k) => { out.settings[k] = $(k).checked; });
+    out.settings.highAction = $('highAction').value;
     const invalid = [];
     for (const k of LISTS) {
       const parsed = parseList($(k).value);
