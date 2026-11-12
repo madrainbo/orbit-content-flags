@@ -73,6 +73,20 @@ class MainActivity : Activity() {
         heading("On-screen flags")
         flagsStatus = body("")
         flagsButton = button("Turn on on-screen flags") { showDisclosure() }
+        body("Most screens produce no flag. To check it is working, show the sample below: " +
+            "a pill should appear near the bottom-right corner within a second.").setPadding(0, dp(12), 0, 0)
+        val sample = body(SAMPLE_TEXT).apply {
+            visibility = View.GONE
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        lateinit var sampleButton: Button
+        sampleButton = button("Show sample text") {
+            val show = sample.visibility != View.VISIBLE
+            sample.visibility = if (show) View.VISIBLE else View.GONE
+            sampleButton.text = if (show) "Hide sample text" else "Show sample text"
+        }
+        // Lets automated tests reveal the sample without tapping.
+        if (intent.getBooleanExtra("show_sample", false)) sampleButton.performClick()
 
         heading("Blocked domains")
         body("One domain per line; subdomains are included. Allow beats block.")
@@ -107,7 +121,9 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         val on = flagsEnabled()
-        flagsStatus.text = if (on) {
+        flagsStatus.text = if (on && !ContentFlagService.connected) {
+            "Enabled in settings but not running yet. If this does not change, turn it off and on again in accessibility settings."
+        } else if (on) {
             "On. A small pill appears over other apps when charged or pressure wording is on screen. Tap it to hide."
         } else {
             "Off. When on, the app reads text shown in other apps to score it."
@@ -181,5 +197,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQUEST_VPN = 1
+        const val SAMPLE_TEXT = "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
+            "disaster!!! Hurry! Only 3 left in stock."
     }
 }

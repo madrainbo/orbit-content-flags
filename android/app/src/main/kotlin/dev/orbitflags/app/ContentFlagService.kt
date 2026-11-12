@@ -22,6 +22,21 @@ class ContentFlagService : AccessibilityService() {
     private var scanPending = false
     private var pill: TextView? = null
     private var dismissedForWindow = false
+    private var noticeShowing = false
+
+    /** Confirms the service is running, since most screens produce no flag. */
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        connected = true
+        noticeShowing = true
+        showPill("Orbit on-screen flags are on")
+        handler.postDelayed({
+            if (noticeShowing) {
+                noticeShowing = false
+                hidePill()
+            }
+        }, NOTICE_MS)
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) dismissedForWindow = false
@@ -37,6 +52,7 @@ class ContentFlagService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        connected = false
         handler.removeCallbacksAndMessages(null)
         hidePill()
         super.onDestroy()
@@ -45,7 +61,8 @@ class ContentFlagService : AccessibilityService() {
     private fun scan() {
         val root = rootInActiveWindow
         val pkg = root?.packageName?.toString()
-        if (root == null || pkg == null || pkg == packageName || pkg in SKIPPED_PACKAGES) {
+        if (noticeShowing) return
+        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES) {
             hidePill()
             return
         }
@@ -96,6 +113,7 @@ class ContentFlagService : AccessibilityService() {
             contentDescription = "Content flags: $text. Tap to hide."
             setOnClickListener {
                 dismissedForWindow = true
+                noticeShowing = false
                 hidePill()
             }
         }
@@ -128,12 +146,18 @@ class ContentFlagService : AccessibilityService() {
         }
     }
 
-    private companion object {
-        const val SCAN_DELAY_MS = 700L
-        const val MAX_NODES = 600
-        const val MAX_DEPTH = 40
-        const val MIN_CHARS = 20
-        const val MAX_CHARS = 2000
-        val SKIPPED_PACKAGES = setOf("com.android.systemui")
+    companion object {
+        /** True while Android has this service bound and running. */
+        @Volatile
+        var connected = false
+            private set
+
+        private const val NOTICE_MS = 4000L
+        private const val SCAN_DELAY_MS = 700L
+        private const val MAX_NODES = 600
+        private const val MAX_DEPTH = 40
+        private const val MIN_CHARS = 20
+        private const val MAX_CHARS = 2000
+        private val SKIPPED_PACKAGES = setOf("com.android.systemui")
     }
 }

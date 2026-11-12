@@ -17,6 +17,10 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 Then open the app, turn on on-screen flags (a disclosure screen comes first), add domains, and start domain blocking. Requires Android 10 or later.
 
+**Installing from an APK file (Android 13+):** Android blocks accessibility access for apps installed outside a store and shows "App was denied access". After seeing that dialog once, open Settings > Apps > Orbit Content Flags, tap the menu in the top-right corner, choose "Allow restricted settings", then turn the service on in Settings > Accessibility. Installs from Google Play are not affected.
+
+**Checking it works:** when the service starts, a pill reading "Orbit on-screen flags are on" appears for a few seconds. Most screens produce no flag, so the app has a "Show sample text" button: with the service on, the pill should appear within a second.
+
 ## Layout
 
 - `core/` is pure Kotlin with no Android dependencies: the scorer, domain lists and DNS packet handling, unit-tested on the JVM. The scorer is a port of `content-filter-extension/core/scoring.js`; both are tested against `shared/scoring-vectors.tsv` so they cannot drift apart.
@@ -24,7 +28,7 @@ Then open the app, turn on on-screen flags (a disclosure screen comes first), ad
 
 ## Limits in v0.1
 
-- **Not run on a device yet.** It compiles, passes lint with no errors and its core logic is unit-tested, but the services have not been exercised on a phone or emulator.
+- **Lightly tested on devices.** On an Android 11 emulator the on-screen flags were checked: the start-up notice appears, the pill shows for the in-app sample, hides on the home screen and returns. Domain blocking has not been exercised on a device or emulator; only its packet handling is unit-tested. Nothing has been checked on Android 12 or later beyond compiling.
 - The scorer is the same unvalidated English word-list heuristic as the extension; no on-device ML model is used.
 - The pill reports counts for the screen; it does not mark individual passages, and there is no dispute action yet.
 - Domain blocking only blocks. There is no "warn first" page as in the browser, because DNS cannot show one.
