@@ -63,7 +63,7 @@ object Patterns {
         P("""\bonlyfans\b""", 2),
         P("""\bhentai\b""", 2),
         P("""\bnudes\b""", 2),
-        P("""\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\b""", 2),
+        P("""\b(?:sex|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\b""", 2),
         P("""\b(?:cam ?girls?|live cams?|escorts?)\b""", 2),
         P("""\bhot (?:singles|girls|babes|milfs?)\b""", 2),
         P("""\bexplicit (?:content|photos|videos|images)\b""", 2),
@@ -80,6 +80,7 @@ object Patterns {
         P("""\b(?:strip|lap) ?(?:tease|dance|club)\b""", 1),
         P("""\b(?:fetish|kinky|bdsm|lewd|thirst trap)\b""", 1),
         P("""\blingerie\b""", 1),
+        P("""\badult (?:video|videos|chat|cam|cams|pics|photos|movies|content|clips|site|sites)\b""", 1),
     )
 
     val HOOK = listOf(

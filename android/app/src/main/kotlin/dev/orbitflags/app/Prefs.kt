@@ -28,6 +28,14 @@ object Prefs {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("read_images", value).apply()
     }
 
+    /** Whether pictures on screen are checked for adult content (default on). */
+    fun checkPictures(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("check_pictures", true)
+
+    fun setCheckPictures(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("check_pictures", value).apply()
+    }
+
     fun save(context: Context, block: List<String>, allow: List<String>) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString("block", block.joinToString("\n"))

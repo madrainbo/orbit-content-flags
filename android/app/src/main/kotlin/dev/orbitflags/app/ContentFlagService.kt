@@ -46,6 +46,7 @@ class ContentFlagService : AccessibilityService() {
     private var screenChanged = true
     private var lastCaptureAt = 0L
     private var screen = Rect()
+    private var pictures: List<Rect> = emptyList()
 
     /** Confirms the service is running, since most screens produce no flag. */
     override fun onServiceConnected() {
@@ -108,8 +109,10 @@ class ContentFlagService : AccessibilityService() {
         }
         screen = Rect().also { root.getBoundsInScreen(it) }
         val passages = ArrayList<Pair<String, Rect>>()
+        val images = ArrayList<Rect>()
         val aiLabel = booleanArrayOf(false)
-        collect(root, passages, 0, intArrayOf(0), aiLabel)
+        collect(root, passages, images, 0, intArrayOf(0), aiLabel)
+        pictures = images.sortedByDescending { it.width().toLong() * it.height() }.take(MAX_PICTURES)
 
         val found = ArrayList<Finding>()
         val seen = HashSet<String>()
@@ -127,11 +130,19 @@ class ContentFlagService : AccessibilityService() {
     }
 
     private fun collect(
-        node: AccessibilityNodeInfo, out: MutableList<Pair<String, Rect>>, depth: Int, visited: IntArray,
-        aiLabel: BooleanArray,
+        node: AccessibilityNodeInfo, out: MutableList<Pair<String, Rect>>, images: MutableList<Rect>,
+        depth: Int, visited: IntArray, aiLabel: BooleanArray,
     ) {
         if (depth > MAX_DEPTH || visited[0] >= MAX_NODES) return
         visited[0] += 1
+        // Remember where pictures and videos are, so the screen capture can check them.
+        val type = node.className?.toString() ?: ""
+        if (node.isVisibleToUser && PICTURE_TYPES.any { type.endsWith(it) }) {
+            val bounds = Rect().also { node.getBoundsInScreen(it) }
+            if (bounds.intersect(screen) && bounds.width() >= dp(MIN_PICTURE_DP) && bounds.height() >= dp(MIN_PICTURE_DP)) {
+                images.add(bounds)
+            }
+        }
         // Never read passwords or what the user is typing.
         if (!node.isPassword && !node.isEditable && node.isVisibleToUser) {
             // Many apps (Instagram, YouTube) put post text in the description, not the text field.
@@ -146,7 +157,7 @@ class ContentFlagService : AccessibilityService() {
         }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            collect(child, out, depth + 1, visited, aiLabel)
+            collect(child, out, images, depth + 1, visited, aiLabel)
         }
     }
 
@@ -172,7 +183,7 @@ class ContentFlagService : AccessibilityService() {
         // Where the capture includes this app's own overlays, skip those areas.
         val ignore = if (v.capturesWindowOnly) emptyList() else overlayRects()
         val keep = if (v.capturesWindowOnly) emptyList() else visionFindings.filter { it.key in covers }
-        v.analyse(windowId, Rect(screen), ignore) { result ->
+        v.analyse(windowId, Rect(screen), pictures, ignore, Prefs.checkPictures(this)) { result ->
             handler.post {
                 capturing = false
                 if (!connected) return@post
@@ -180,6 +191,14 @@ class ContentFlagService : AccessibilityService() {
                     visionFindings = keep + result.findings.filter { f -> keep.none { it.key == f.key } }
                     visionAiLabel = result.aiLabel
                     render()
+                }
+                // The screen may have moved on while this capture was being analysed.
+                if (screenChanged && !scanPending) {
+                    scanPending = true
+                    handler.postDelayed({
+                        scanPending = false
+                        scan()
+                    }, SCAN_DELAY_MS)
                 }
             }
         }
@@ -204,8 +223,9 @@ class ContentFlagService : AccessibilityService() {
         val screenArea = screen.width().toLong() * screen.height()
         val hide = Prefs.hideFlagged(this)
         val toCover = if (!hide) emptyList() else all.filter { f ->
-            f.key !in revealed &&
-                f.bounds.width().toLong() * f.bounds.height() <= screenArea * MAX_COVER_SHARE
+            // Text covers stay small; a flagged picture is covered whatever its size.
+            f.key !in revealed && (f.key.startsWith("i:") ||
+                f.bounds.width().toLong() * f.bounds.height() <= screenArea * MAX_COVER_SHARE)
         }.take(MAX_COVERS)
         setCovers(toCover)
 
@@ -374,6 +394,10 @@ class ContentFlagService : AccessibilityService() {
         private const val MAX_REVEALED = 200
         /** A cover never takes more than this share of the screen. */
         private const val MAX_COVER_SHARE = 0.7
+        private const val MAX_PICTURES = 8
+        private const val MIN_PICTURE_DP = 96f
+        /** Accessibility class names used for pictures and video, in apps and in browsers. */
+        private val PICTURE_TYPES = listOf("ImageView", "Image", "VideoView", "TextureView", "SurfaceView")
         private val SKIPPED_PACKAGES = setOf("com.android.systemui")
         private val KIND_NAMES = linkedMapOf(
             "adult" to "adult", "scam" to "scam-style", "charge" to "high-charge", "hook" to "engagement-bait",

@@ -58,7 +58,7 @@
     ["\\bonlyfans\\b", 2],
     ["\\bhentai\\b", 2],
     ["\\bnudes\\b", 2],
-    ["\\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b", 2],
+    ["\\b(?:sex|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b", 2],
     ["\\b(?:cam ?girls?|live cams?|escorts?)\\b", 2],
     ["\\bhot (?:singles|girls|babes|milfs?)\\b", 2],
     ["\\bexplicit (?:content|photos|videos|images)\\b", 2],
@@ -75,6 +75,7 @@
     ["\\b(?:strip|lap) ?(?:tease|dance|club)\\b", 1],
     ["\\b(?:fetish|kinky|bdsm|lewd|thirst trap)\\b", 1],
     ["\\blingerie\\b", 1],
+    ["\\badult (?:video|videos|chat|cam|cams|pics|photos|movies|content|clips|site|sites)\\b", 1],
     ]),
     HOOK: compile([
     ["\\bshare (?:this )?before (?:it'?s|it gets|they) (?:deleted?|taken down|removed?|banned)\\b", 2],

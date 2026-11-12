@@ -46,6 +46,7 @@ const TEXTS = [
   'Recover your lost crypto with our certified experts, 100% guaranteed',
   'Beach day with the family, link in bio for the full album',
   'Watch until the end to see how the cake turned out',
+  'Settings: block adult content and gambling sites',
   'AI-generated',
   'Creator labeled as AI-generated',
   'Altered or synthetic content',

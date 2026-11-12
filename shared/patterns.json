@@ -209,7 +209,7 @@
       "w": 2
     },
     {
-      "re": "\\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b",
+      "re": "\\b(?:sex|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b",
       "w": 2
     },
     {
@@ -274,6 +274,10 @@
     },
     {
       "re": "\\blingerie\\b",
+      "w": 1
+    },
+    {
+      "re": "\\badult (?:video|videos|chat|cam|cams|pics|photos|movies|content|clips|site|sites)\\b",
       "w": 1
     }
   ],

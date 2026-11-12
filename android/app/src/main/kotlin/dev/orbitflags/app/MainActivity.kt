@@ -20,6 +20,7 @@ import dev.orbitflags.core.Domains
 
 class MainActivity : Activity() {
     private lateinit var flagsStatus: TextView
+    private lateinit var visionStatus: TextView
     private lateinit var flagsButton: Button
     private lateinit var dnsButton: Button
     private lateinit var blockInput: EditText
@@ -79,10 +80,16 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
         })
         column.addView(android.widget.CheckBox(this).apply {
-            text = "Also read text inside images (captures the screen on this device)"
+            text = "Capture the screen to read text inside images (stays on this device)"
             isChecked = Prefs.readImages(this@MainActivity)
             setOnCheckedChangeListener { _, checked -> Prefs.setReadImages(this@MainActivity, checked) }
         })
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Check pictures for adult content (needs the option above)"
+            isChecked = Prefs.checkPictures(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setCheckPictures(this@MainActivity, checked) }
+        })
+        visionStatus = body("")
         body("Most screens produce no flag. To check it is working, show the sample below: " +
             "four samples, the last one a picture of text, should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again.").setPadding(0, dp(12), 0, 0)
         val samples = SAMPLES.map { text ->
@@ -93,8 +100,8 @@ class MainActivity : Activity() {
         }
         // A picture of text: invisible to the text reader, so only screen capture can catch it.
         val sampleImage = android.widget.ImageView(this).apply {
-            setImageBitmap(textAsPicture("Your account has been suspended.", "Verify your identity to claim your refund."))
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            setImageBitmap(textAsPicture("Security notice", "Your account has been suspended.", "Verify your identity to claim your refund."))
+            contentDescription = "Sample picture"
             visibility = View.GONE
             adjustViewBounds = true
         }
@@ -164,6 +171,13 @@ class MainActivity : Activity() {
         }
         flagsButton.text = if (on) "Open accessibility settings" else "Turn on on-screen flags"
         dnsButton.text = if (DnsFilterService.running) "Stop domain blocking" else "Start domain blocking"
+        val summary = ScreenVision.lastSummary
+        visionStatus.text = if (summary == null) {
+            "No screen check has run yet."
+        } else {
+            val seconds = (System.currentTimeMillis() - ScreenVision.lastSummaryAt) / 1000
+            "Last screen check, $seconds s ago: $summary."
+        }
     }
 
     /** Prominent disclosure and consent before the accessibility permission is requested. */
