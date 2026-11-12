@@ -79,15 +79,17 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
         })
         body("Most screens produce no flag. To check it is working, show the sample below: " +
-            "the sample should be covered by a \"Hidden\" notice within a second, and tapping the notice shows it again.").setPadding(0, dp(12), 0, 0)
-        val sample = body(SAMPLE_TEXT).apply {
-            visibility = View.GONE
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            "three samples should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again.").setPadding(0, dp(12), 0, 0)
+        val samples = SAMPLES.map { text ->
+            body(text).apply {
+                visibility = View.GONE
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+            }
         }
         lateinit var sampleButton: Button
         sampleButton = button("Show sample text") {
-            val show = sample.visibility != View.VISIBLE
-            sample.visibility = if (show) View.VISIBLE else View.GONE
+            val show = samples[0].visibility != View.VISIBLE
+            samples.forEach { it.visibility = if (show) View.VISIBLE else View.GONE }
             sampleButton.text = if (show) "Hide sample text" else "Show sample text"
         }
         // Lets automated tests reveal the sample without tapping.
@@ -129,7 +131,7 @@ class MainActivity : Activity() {
         flagsStatus.text = if (on && !ContentFlagService.connected) {
             "Enabled in settings but not running yet. If this does not change, turn it off and on again in accessibility settings."
         } else if (on) {
-            "On. Highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
+            "On. Scam-style, adult and highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
         } else {
             "Off. When on, the app reads text shown in other apps to score it."
         }
@@ -202,7 +204,12 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQUEST_VPN = 1
-        const val SAMPLE_TEXT = "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
-            "disaster!!! Hurry! Only 3 left in stock."
+        val SAMPLES = listOf(
+            "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
+                "disaster!!! Hurry! Only 3 left in stock.",
+            "Sample: Congratulations! You have been selected. Click here to claim your prize.",
+            "Sample: Hot singles in your area want to chat. 18+ only, uncensored live cams.",
+            "AI info",
+        )
     }
 }

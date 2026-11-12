@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { scoreEmotion, urgencySignals, describeCategories } = require('../core/scoring.js');
+const { scoreEmotion, urgencySignals, describeCategories, classify, isAiLabel } = require('../core/scoring.js');
 const { normalizeDomain, parseList, inList, buildRules } = require('../core/domains.js');
 const { readImageLabels, extractClaimReviews, extractIntent, parseClaimSearch } = require('../core/labels.js');
 
@@ -149,4 +149,33 @@ test('describeCategories names the top two categories', () => {
   assert.equal(describeCategories([h('bait')]), 'clickbait wording');
   assert.equal(describeCategories([h('fear'), h('outrage')]), 'outrage and fear wording');
   assert.equal(describeCategories([]), 'capitals and exclamation marks');
+});
+
+test('generated pattern tables are current', () => {
+  const fs = require('node:fs');
+  const { render, JS_OUT, KT_OUT } = require('./gen-patterns.js');
+  const { js, kotlin } = render();
+  assert.equal(fs.readFileSync(JS_OUT, 'utf8'), js, 'run: node test/gen-patterns.js --write');
+  assert.equal(fs.readFileSync(KT_OUT, 'utf8'), kotlin, 'run: node test/gen-patterns.js --write');
+});
+
+test('classify flags scam-style and adult wording, and leaves ordinary text alone', () => {
+  assert.equal(classify('Congratulations! You have been selected. Click here to claim your prize.').kind, 'scam');
+  assert.equal(classify('Your account has been suspended. Verify your identity now.').kind, 'scam');
+  assert.equal(classify('Hot singles in your area want to chat, 18+ only.').kind, 'adult');
+  assert.equal(classify('SHOCKING betrayal: corrupt officials DESTROY town in terrifying disaster!!!').kind, 'charge');
+  // One weak signal is not enough.
+  assert.equal(classify('Congratulations to the class of 2026 on their graduation day.').kind, null);
+  assert.equal(classify('Please verify your email address to finish creating your account.').kind, null);
+  assert.equal(classify('The gallery added a nude study by a Renaissance painter to its collection.').kind, null);
+  assert.equal(classify('Sex education classes begin next term for year nine pupils.').kind, null);
+  // Adult reasons never echo the matched words.
+  assert.equal(classify('Watch free porn videos and XXX clips, NSFW.').reason, 'adult-content wording');
+});
+
+test('isAiLabel matches whole labels only', () => {
+  for (const t of ['AI-generated', 'AI info', 'Made with AI', 'Creator labeled as AI-generated',
+    'Altered or synthetic content', ' ai generated. ']) assert.equal(isAiLabel(t), true, t);
+  for (const t of ['Experts say AI-generated images are getting harder to spot.', 'AI', 'Info', ''])
+    assert.equal(isAiLabel(t), false, t);
 });

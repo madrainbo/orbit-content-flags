@@ -101,7 +101,47 @@
     return counts.slice(0, 2).map((c) => c.name).join(' and ') + ' wording';
   }
 
-  const api = { scoreEmotion, urgencySignals, describeCategories, THRESHOLDS, LEXICON };
+  // Scam-style and adult wording, from the generated pattern tables.
+  const P = (typeof module !== 'undefined' && module.exports) ? require('./patterns.js') : root.OCFPatterns;
+
+  function matchPatterns(list, t) {
+    let weight = 0;
+    const matches = [];
+    for (const { re, w } of list) {
+      const m = t.match(re);
+      if (m) { weight += w; matches.push(m[0].toLowerCase()); }
+    }
+    return { weight, matches };
+  }
+
+  // Decides whether a passage should be flagged, and why. Adult wording wins
+  // over scam-style wording, which wins over high emotional charge.
+  function classify(text) {
+    const t = String(text || '');
+    const emotion = scoreEmotion(t);
+    if (matchPatterns(P.ADULT, t).weight >= P.THRESHOLD) {
+      return { kind: 'adult', reason: 'adult-content wording', emotion };
+    }
+    const scam = matchPatterns(P.SCAM, t);
+    if (scam.weight >= P.THRESHOLD) {
+      const quoted = scam.matches.slice(0, 2).map((m) => '\u201c' + m.slice(0, 40) + '\u201d').join(', ');
+      return { kind: 'scam', reason: 'scam-style wording (' + quoted + ')', emotion };
+    }
+    if (emotion.tier === 'high') {
+      return { kind: 'charge', reason: 'high emotional charge (' + describeCategories(emotion.hits) + ')', emotion };
+    }
+    return { kind: null, reason: '', emotion };
+  }
+
+  // True when a short piece of text is, in full, an "AI-generated" label of
+  // the kind platforms display. Deliberately exact: prose that merely
+  // mentions AI-generated content does not match.
+  function isAiLabel(text) {
+    const t = String(text || '').trim();
+    return t.length <= 60 && P.AI_LABEL.test(t);
+  }
+
+  const api = { scoreEmotion, urgencySignals, describeCategories, classify, isAiLabel, THRESHOLDS, LEXICON };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.OCFScoring = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

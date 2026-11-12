@@ -1,0 +1,59 @@
+// GENERATED from shared/patterns.json by test/gen-patterns.js. Do not edit.
+(function (root) {
+  'use strict';
+  const compile = (list) => list.map(([re, w]) => ({ re: new RegExp(re, 'i'), w }));
+  const api = {
+    THRESHOLD: 2,
+    SCAM: compile([
+    ["\\byou(?:'ve| have)? (?:just )?won\\b", 2],
+    ["\\bclaim (?:your|the|my) (?:prize|reward|gift|winnings|bonus|refund)\\b", 2],
+    ["\\b(?:you have|you've|you were|you are) been (?:selected|chosen)\\b", 1],
+    ["\\bcongratulations\\b", 1],
+    ["\\b(?:verify|confirm|update|validate) your (?:account|identity|payment|billing|bank|card|password|details)\\b", 2],
+    ["\\baccount (?:has been|is|was|will be) (?:suspended|locked|blocked|disabled|compromised|restricted|closed)\\b", 2],
+    ["\\b(?:unusual|suspicious) (?:activity|sign-in|login|transaction)\\b", 1],
+    ["\\b(?:urgent|immediate) action (?:is )?(?:required|needed)\\b", 1],
+    ["\\bfinal (?:notice|warning|reminder)\\b", 1],
+    ["\\bclick (?:here|the link|this link|below) to (?:claim|verify|confirm|unlock|receive|restore)\\b", 2],
+    ["\\b(?:guaranteed|risk[- ]free) (?:returns?|profits?|income|earnings|investment|winnings)\\b", 2],
+    ["\\bdouble your (?:money|bitcoin|crypto|investment|deposit)\\b", 2],
+    ["\\b(?:earn|make) (?:up to )?[$£€]\\s?\\d[\\d,]*k? ?(?:per|a|an|every|each|/) ?(?:day|week|hour|month)\\b", 2],
+    ["\\b(?:crypto|bitcoin|btc|eth|usdt) giveaway\\b", 2],
+    ["\\bsend (?:me |us )?(?:\\d[\\d.,]* )?(?:btc|bitcoin|eth|usdt|crypto)\\b", 2],
+    ["\\b(?:pay|payment) (?:with|by|in|using|via) gift cards?\\b", 2],
+    ["\\b(?:buy|purchase|send) (?:\\w+ )?gift cards?\\b", 1],
+    ["\\bwire transfer\\b", 1],
+    ["\\bfree (?:iphone|gift card|money|cash|crypto|bitcoin)\\b", 1],
+    ["\\bno experience (?:needed|required|necessary)\\b", 1],
+    ["\\bwork from home\\b", 1],
+    ["\\b100% (?:free|guaranteed|safe|legit)\\b", 1],
+    ["\\bact (?:now|fast|immediately)\\b", 1],
+    ["\\b(?:limited|exclusive)[- ](?:time )?(?:offer|deal|slots?|spots?)\\b", 1],
+    ["\\b(?:dm|message|text|whatsapp|telegram) (?:me|us) (?:now |today )?(?:to|for) \\w+", 1],
+    ["\\b(?:loan|credit) (?:is |has been )?(?:pre-?approved|approved instantly)\\b", 1],
+    ["\\b(?:parcel|package|delivery) (?:is |has been )?(?:on hold|held|pending|undeliverable|could not be delivered)\\b", 1],
+    ["\\b(?:small|customs|redelivery|processing|release) fee\\b", 1],
+    ["\\binvestment opportunity\\b", 1],
+    ["\\bget rich\\b", 1],
+    ]),
+    ADULT: compile([
+    ["\\bporn\\w*", 2],
+    ["\\bxxx\\b", 2],
+    ["\\bnsfw\\b", 2],
+    ["\\bonlyfans\\b", 2],
+    ["\\bhentai\\b", 2],
+    ["\\bnudes\\b", 2],
+    ["\\b(?:sex|adult|nude|naked|erotic) (?:video|videos|tape|chat|cam|cams|pics|photos|movies|content|clips)\\b", 2],
+    ["\\b(?:cam ?girls?|live cams?|escorts?)\\b", 2],
+    ["\\bhot (?:singles|girls|babes|milfs?)\\b", 2],
+    ["\\bexplicit (?:content|photos|videos|images)\\b", 2],
+    ["\\b(?:nude|naked|topless)\\b", 1],
+    ["\\b(?:18\\+|adults only|over 18 only)", 1],
+    ["\\b(?:sexy|horny|hookups?|sexting|uncensored)\\b", 1],
+    ["\\berotic\\w*", 1],
+    ]),
+    AI_LABEL: new RegExp("^(?:ai[- ]generated|ai[- ]generated content|ai info|made with ai|created with ai|generated (?:with|by) ai|imagined with ai|creator labell?ed as ai-generated|altered or synthetic content|contains ai-generated (?:content|media)|synthetic media|ai-generated image|ai-generated video)\\.?$", 'i'),
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.OCFPatterns = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);

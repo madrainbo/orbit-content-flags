@@ -44,6 +44,10 @@ const PAGE = `<!doctype html><title>t</title>
 <h1>SHOCKING betrayal: corrupt officials DESTROY town in terrifying disaster!!!</h1>
 <p>The city council met on Tuesday to discuss the annual budget and road repairs.</p>
 <p>Hurry! Only 3 left in stock.</p>
+<p id="scam">Congratulations! You have been selected. Click here to claim your prize.</p>
+<p id="adult">Hot singles in your area want to chat. 18+ only, uncensored live cams.</p>
+<p id="prose">Experts say AI-generated images are getting harder to spot.</p>
+<article id="post"><span>AI info</span><div>A perfectly ordinary looking photo caption.</div></article>
 <video autoplay muted></video>`;
 
 (async () => {
@@ -81,12 +85,33 @@ const PAGE = `<!doctype html><title>t</title>
     assert.match(await page.locator('h1').evaluate((h) => h.previousElementSibling.textContent),
       /^Hidden: high emotional charge \(.* wording\)\.Show$/);
     assert.equal(await page.locator('.ocf-chip').count(), 0, 'no label until shown');
+
+    // Scam-style and adult wording are hidden too, each with its own reason.
+    assert.ok(await page.locator('#scam').isHidden());
+    assert.match(await page.locator('#scam').evaluate((p) => p.previousElementSibling.textContent),
+      /^Hidden: scam-style wording \(.claim your prize., .you have been selected.\)\.Show$/);
+    assert.ok(await page.locator('#adult').isHidden());
+    assert.equal(await page.locator('#adult').evaluate((p) => p.previousElementSibling.textContent),
+      'Hidden: adult-content wording.Show');
+    // A post carrying the site's own "AI info" badge is hidden; prose about AI is not.
+    assert.ok(await page.locator('#post').isHidden());
+    assert.equal(await page.locator('#post').evaluate((p) => p.previousElementSibling.textContent),
+      'Hidden: post labelled AI-generated.Show');
+    assert.ok(await page.locator('#prose').isVisible());
+    for (const id of ['scam', 'adult', 'post']) {
+      await page.locator('#' + id).evaluate((p) => p.previousElementSibling.querySelector('button').click());
+      assert.ok(await page.locator('#' + id).isVisible(), id + ' is restored by Show');
+    }
+    assert.equal(await page.locator('.ocf-chip').count(), 2, 'scam and adult labels appear once shown');
+    await page.locator('#scam .ocf-chip').click();
+    await page.locator('#adult .ocf-chip').click();
     await page.locator('h1').evaluate((h) => h.previousElementSibling.querySelector('button').click());
     assert.ok(await page.locator('h1').isVisible(), 'Show restores the heading');
     await page.waitForSelector('.ocf-chip.ocf-high');
     assert.equal(await page.locator('.ocf-chip').count(), 1, 'only the charged heading is flagged');
     const panel = await page.locator('#ocf-panel-host').evaluate((h) => h.shadowRoot.textContent);
     assert.match(panel, /1 high-charge passage/);
+    assert.match(panel, /Labelled .AI info. by the site/);
     assert.match(panel, /Pressure wording/);
     assert.match(panel, /Autoplay video/);
 
@@ -113,7 +138,7 @@ const PAGE = `<!doctype html><title>t</title>
     // 3. Save lists through the options page.
     const opts = await ctx.newPage();
     await opts.goto(`chrome-extension://${extId}/options.html`);
-    await opts.waitForFunction(() => /disputed 1 flag/.test(document.getElementById('disputes').textContent));
+    await opts.waitForFunction(() => /disputed 3 flags/.test(document.getElementById('disputes').textContent));
     await opts.fill('#warn', 'warned.test');
     await opts.fill('#block', 'https://www.blocked.test/x');
     await opts.click('#save');

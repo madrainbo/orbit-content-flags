@@ -14,13 +14,17 @@ class ScoringTest {
     @Test
     fun matchesSharedVectors() {
         val lines = File("../../shared/scoring-vectors.tsv").readLines().filter { it.isNotBlank() }
-        assertTrue(lines.size >= 10, "expected shared vectors")
+        assertTrue(lines.size >= 30, "expected shared vectors")
         for (line in lines) {
-            val cols = line.split('\t', limit = 6)
-            val (tier, score, hits, urgency, reason) = cols
-            val text = cols[5]
+            val cols = line.split('\t', limit = 9)
+            val (tier, score, hits, urgency, wording) = cols
+            val text = cols[8]
             val r = Scoring.scoreEmotion(text)
-            assertEquals(reason, Scoring.describeCategories(r.hits), text)
+            assertEquals(wording, Scoring.describeCategories(r.hits), text)
+            val c = Scoring.classify(text)
+            assertEquals(cols[5], c.kind ?: "-", text)
+            assertEquals(cols[6], c.reason.ifEmpty { "-" }, text)
+            assertEquals(cols[7], if (Scoring.isAiLabel(text)) "ai" else "-", text)
             assertEquals(tier, r.tier, text)
             assertEquals(score.toInt(), r.score, text)
             assertEquals(hits.toInt(), r.hits.size, text)

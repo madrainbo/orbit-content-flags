@@ -82,42 +82,46 @@ class ContentFlagService : AccessibilityService() {
         }
         val screen = Rect().also { root.getBoundsInScreen(it) }
         val passages = ArrayList<Passage>()
-        collect(root, passages, screen, 0, intArrayOf(0))
+        val aiLabel = booleanArrayOf(false)
+        collect(root, passages, screen, 0, intArrayOf(0), aiLabel)
 
-        val high = ArrayList<Pair<Passage, Scoring.Result>>()
+        val flagged = ArrayList<Pair<Passage, Scoring.Classification>>()
         val seen = HashSet<String>()
         for (p in passages) {
             if (!seen.add(p.text)) continue
-            val result = Scoring.scoreEmotion(p.text)
-            if (result.tier == "high") high.add(p to result)
+            val c = Scoring.classify(p.text)
+            if (c.kind != null) flagged.add(p to c)
         }
         val hide = Prefs.hideFlagged(this)
-        val toCover = if (hide) high.filter { it.first.text !in revealed }.take(MAX_COVERS) else emptyList()
+        val toCover = if (hide) flagged.filter { it.first.text !in revealed }.take(MAX_COVERS) else emptyList()
         setCovers(toCover)
 
         if (noticeShowing) return
         val pressure = Scoring.urgencySignals(passages.joinToString("\n") { it.text }).isNotEmpty()
         val parts = ArrayList<String>()
-        if (high.isNotEmpty()) {
-            val n = high.size
-            val hidden = toCover.size
-            parts.add(
-                (if (n == 1) "1 high-charge passage" else "$n high-charge passages") +
-                    (if (hidden > 0) " ($hidden hidden)" else "")
-            )
+        for ((kind, name) in KIND_NAMES) {
+            val n = flagged.count { it.second.kind == kind }
+            if (n > 0) parts.add("$n $name")
         }
+        if (toCover.isNotEmpty()) parts.add("${toCover.size} hidden")
+        if (aiLabel[0]) parts.add("AI label on screen")
         if (pressure) parts.add("pressure wording")
         if (parts.isEmpty() || pillDismissed) hidePill() else showPill(parts.joinToString(" · "))
     }
 
     private fun collect(
         node: AccessibilityNodeInfo, out: MutableList<Passage>, screen: Rect, depth: Int, visited: IntArray,
+        aiLabel: BooleanArray,
     ) {
         if (depth > MAX_DEPTH || visited[0] >= MAX_NODES) return
         visited[0] += 1
         // Never read passwords or what the user is typing.
         if (!node.isPassword && !node.isEditable && node.isVisibleToUser) {
             val text = node.text?.toString()?.trim()
+            // Short badges such as "AI info" are labels the app itself displays.
+            if (!aiLabel[0] && (Scoring.isAiLabel(text) || Scoring.isAiLabel(node.contentDescription?.toString()))) {
+                aiLabel[0] = true
+            }
             if (text != null && text.length >= MIN_CHARS) {
                 val bounds = Rect().also { node.getBoundsInScreen(it) }
                 if (bounds.intersect(screen)) out.add(Passage(text.take(MAX_CHARS), bounds))
@@ -125,7 +129,7 @@ class ContentFlagService : AccessibilityService() {
         }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            collect(child, out, screen, depth + 1, visited)
+            collect(child, out, screen, depth + 1, visited, aiLabel)
         }
     }
 
@@ -149,7 +153,7 @@ class ContentFlagService : AccessibilityService() {
     }
 
     /** Makes the covers on screen match [wanted]: move, add and remove as needed. */
-    private fun setCovers(wanted: List<Pair<Passage, Scoring.Result>>) {
+    private fun setCovers(wanted: List<Pair<Passage, Scoring.Classification>>) {
         val wm = windowManager()
         val keep = wanted.map { it.first.text }.toSet()
         val stale = covers.keys.filter { it !in keep }
@@ -167,9 +171,8 @@ class ContentFlagService : AccessibilityService() {
                 }
                 continue
             }
-            val reason = Scoring.describeCategories(result.hits)
             val view = TextView(this).apply {
-                text = "Hidden: high emotional charge ($reason). Tap to show."
+                text = "Hidden: ${result.reason}. Tap to show."
                 textSize = 13f
                 gravity = Gravity.CENTER
                 maxLines = 3
@@ -273,5 +276,6 @@ class ContentFlagService : AccessibilityService() {
         private const val MAX_COVERS = 12
         private const val MAX_REVEALED = 200
         private val SKIPPED_PACKAGES = setOf("com.android.systemui")
+        private val KIND_NAMES = linkedMapOf("adult" to "adult", "scam" to "scam-style", "charge" to "high-charge")
     }
 }

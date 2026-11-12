@@ -1,14 +1,33 @@
-low	0	0		capitals and exclamation marks	The city council met on Tuesday to discuss the annual budget and road repairs.
-high	98	6		outrage and fear wording	SHOCKING betrayal: corrupt officials DESTROY town in terrifying disaster!!!
-medium	70	1		fear wording	Flood disaster hits coastal town today
-insufficient-text	0	0		capitals and exclamation marks	Total disaster
-low	0	0		capitals and exclamation marks	She wore a hat and chatted about the evening weather with friends.
-low	5	0	low-stock,activity-notice,hurry	capitals and exclamation marks	Hurry! Only 3 left in stock. 12 people are viewing this.
-low	0	0		capitals and exclamation marks	Delivery takes three to five working days.
-high	85	4		clickbait wording	You won't believe what happened next. It is INSANE and jaw-dropping!
-high	70	5		fear wording	Experts warn the crisis could collapse into chaos, a nightmare for families. Panic is spreading.
-low	15	0		capitals and exclamation marks	BREAKING NEWS FROM THE CAPITAL TODAY
-low	8	0	deadline,hurry	capitals and exclamation marks	Sale ends tonight! Act now, this deal is selling fast.
-high	70	6		outrage wording	The traitor's shameless hypocrisy disgusted voters, who called the scandal an outrage.
-low	15	0		capitals and exclamation marks	Wow! Great! Nice! Really good work on this one!
-low	23	1		fear wording	A long and careful report on river levels found one alarming reading among several hundred ordinary measurements taken over the spring months by local volunteers.
+low	0	0		capitals and exclamation marks	-	-	-	The city council met on Tuesday to discuss the annual budget and road repairs.
+high	98	6		outrage and fear wording	charge	high emotional charge (outrage and fear wording)	-	SHOCKING betrayal: corrupt officials DESTROY town in terrifying disaster!!!
+medium	70	1		fear wording	-	-	-	Flood disaster hits coastal town today
+insufficient-text	0	0		capitals and exclamation marks	-	-	-	Total disaster
+low	0	0		capitals and exclamation marks	-	-	-	She wore a hat and chatted about the evening weather with friends.
+low	5	0	low-stock,activity-notice,hurry	capitals and exclamation marks	-	-	-	Hurry! Only 3 left in stock. 12 people are viewing this.
+low	0	0		capitals and exclamation marks	-	-	-	Delivery takes three to five working days.
+high	85	4		clickbait wording	scam	scam-style wording (“you won”)	-	You won't believe what happened next. It is INSANE and jaw-dropping!
+high	70	5		fear wording	charge	high emotional charge (fear wording)	-	Experts warn the crisis could collapse into chaos, a nightmare for families. Panic is spreading.
+low	15	0		capitals and exclamation marks	-	-	-	BREAKING NEWS FROM THE CAPITAL TODAY
+low	8	0	deadline,hurry	capitals and exclamation marks	-	-	-	Sale ends tonight! Act now, this deal is selling fast.
+high	70	6		outrage wording	charge	high emotional charge (outrage wording)	-	The traitor's shameless hypocrisy disgusted voters, who called the scandal an outrage.
+low	15	0		capitals and exclamation marks	-	-	-	Wow! Great! Nice! Really good work on this one!
+low	5	0		capitals and exclamation marks	scam	scam-style wording (“claim your prize”, “you have been selected”)	-	Congratulations! You have been selected. Click here to claim your prize.
+low	0	0		capitals and exclamation marks	scam	scam-style wording (“verify your identity”, “account has been suspended”)	-	Your account has been suspended. Verify your identity now to avoid closure.
+low	0	0		capitals and exclamation marks	scam	scam-style wording (“earn $500 per day”, “no experience needed”)	-	Earn $500 per day working from home, no experience needed. DM me to start.
+low	4	0		capitals and exclamation marks	scam	scam-style wording (“double your bitcoin”, “crypto giveaway”)	-	Double your bitcoin today: send 0.1 BTC and get 0.2 back. Crypto giveaway!
+low	0	0		capitals and exclamation marks	scam	scam-style wording (“parcel is on hold”, “redelivery fee”)	-	Your parcel is on hold. Pay a small redelivery fee to release it.
+low	0	0		capitals and exclamation marks	scam	scam-style wording (“unusual sign-in”, “urgent action required”)	-	Unusual sign-in detected. Final notice: urgent action required.
+low	0	0		capitals and exclamation marks	scam	scam-style wording (“pay with gift cards”, “buy three gift cards”)	-	Pay with gift cards only. Buy three gift cards and send the codes.
+low	0	0	hurry	capitals and exclamation marks	scam	scam-style wording (“guaranteed returns”, “act now”)	-	Guaranteed returns of 40% a month. A risk-free investment opportunity, act now.
+low	0	0		capitals and exclamation marks	-	-	-	Congratulations to the class of 2026 on their graduation day.
+low	0	0		capitals and exclamation marks	-	-	-	Please verify your email address to finish creating your account.
+low	0	0		capitals and exclamation marks	adult	adult-content wording	-	Hot singles in your area want to chat. 18+ only, uncensored live cams.
+low	8	0		capitals and exclamation marks	adult	adult-content wording	-	Watch free porn videos and XXX clips, NSFW.
+low	0	0		capitals and exclamation marks	-	-	-	The gallery added a nude study by a Renaissance painter to its collection.
+low	0	0		capitals and exclamation marks	-	-	-	Sex education classes begin next term for year nine pupils.
+insufficient-text	0	0		capitals and exclamation marks	-	-	ai	AI-generated
+low	0	0		capitals and exclamation marks	-	-	ai	Creator labeled as AI-generated
+low	0	0		capitals and exclamation marks	-	-	ai	Altered or synthetic content
+insufficient-text	0	0		capitals and exclamation marks	-	-	ai	AI info
+low	0	0		capitals and exclamation marks	-	-	-	Experts say AI-generated images are getting harder to spot.
+low	23	1		fear wording	-	-	-	A long and careful report on river levels found one alarming reading among several hundred ordinary measurements taken over the spring months by local volunteers.

@@ -95,6 +95,50 @@ object Scoring {
         return counts.sortedByDescending { it.second }.take(2).joinToString(" and ") { it.first } + " wording"
     }
 
+    /** kind is "adult", "scam", "charge" or null when the passage is not flagged. */
+    data class Classification(val kind: String?, val reason: String, val emotion: Result)
+
+    private fun matchPatterns(list: List<Patterns.Entry>, t: String): Pair<Int, List<String>> {
+        var weight = 0
+        val matches = ArrayList<String>()
+        for (entry in list) {
+            val m = entry.re.find(t) ?: continue
+            weight += entry.w
+            matches.add(m.value.lowercase())
+        }
+        return weight to matches
+    }
+
+    /**
+     * Decides whether a passage should be flagged, and why. Adult wording wins
+     * over scam-style wording, which wins over high emotional charge.
+     */
+    fun classify(text: String?): Classification {
+        val t = text ?: ""
+        val emotion = scoreEmotion(t)
+        if (matchPatterns(Patterns.ADULT, t).first >= Patterns.THRESHOLD) {
+            return Classification("adult", "adult-content wording", emotion)
+        }
+        val (weight, matches) = matchPatterns(Patterns.SCAM, t)
+        if (weight >= Patterns.THRESHOLD) {
+            val quoted = matches.take(2).joinToString(", ") { "\u201c" + it.take(40) + "\u201d" }
+            return Classification("scam", "scam-style wording ($quoted)", emotion)
+        }
+        if (emotion.tier == "high") {
+            return Classification("charge", "high emotional charge (" + describeCategories(emotion.hits) + ")", emotion)
+        }
+        return Classification(null, "", emotion)
+    }
+
+    /**
+     * True when a short piece of text is, in full, an "AI-generated" label of
+     * the kind platforms display. Prose that merely mentions AI does not match.
+     */
+    fun isAiLabel(text: String?): Boolean {
+        val t = (text ?: "").trim()
+        return t.length <= 60 && Patterns.AI_LABEL.matches(t)
+    }
+
     private val URGENCY = listOf(
         "low-stock" to Regex("\\bonly\\s+\\d+\\s+(?:left|remaining)\\b", RegexOption.IGNORE_CASE),
         "activity-notice" to Regex(

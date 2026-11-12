@@ -3,7 +3,7 @@
 // anywhere; the only requests are re-reads of images already on the page.
 (async function () {
   'use strict';
-  const { scoreEmotion, urgencySignals, describeCategories } = globalThis.OCFScoring;
+  const { urgencySignals, describeCategories, classify, isAiLabel } = globalThis.OCFScoring;
   const { extractClaimReviews, extractIntent } = globalThis.OCFLabels;
   const stored = await chrome.storage.sync.get({ settings: {} });
   const settings = { enabled: true, showMedium: false, readImageLabels: true, ...stored.settings };
@@ -15,10 +15,14 @@
 
   const MAX_BLOCKS = 600;
   const MAX_IMAGES = 20;
+  const MAX_AI_LABELS = 20;
   const SELECTOR = 'h1, h2, h3, p, [role="heading"]';
-  const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Emotional charge', 'Design'];
+  const GROUPS = ['Origin', 'Fact-checks', 'Intent', 'Scam and adult', 'Emotional charge', 'Design'];
   const seen = new WeakSet();
-  const state = { high: 0, medium: 0, hidden: 0, scanned: 0, images: 0, signals: new Map() };
+  const state = {
+    counts: { charge: 0, scam: 0, adult: 0, medium: 0 },
+    hidden: 0, scanned: 0, images: 0, aiLabels: 0, signals: new Map(),
+  };
   let host = null;
   let dismissed = false;
 
@@ -50,16 +54,7 @@
     renderPanel();
   });
 
-  // ---------- emotional charge ----------
-
-  function describe(result) {
-    const terms = [...new Set(result.hits.map((h) => h.term))].slice(0, 6);
-    const parts = [];
-    if (terms.length) parts.push('charged words: ' + terms.join(', '));
-    if (result.capsRatio >= 0.15) parts.push('heavy capitals');
-    if (result.exclaimRate >= 0.5) parts.push('exclamation marks');
-    return parts.join('; ');
-  }
+  // ---------- per-passage flags: adult, scam-style, emotional charge ----------
 
   // Replaces el with a one-line notice and a Show button. Nothing is removed
   // from the page: pressing Show puts the element back exactly as it was.
@@ -86,30 +81,34 @@
     state.hidden += 1;
   }
 
-  function flag(el, result) {
+  const CHIP_TEXT = { charge: 'high charge', scam: 'scam-style', adult: 'adult', medium: 'charged' };
+
+  // f: { kind, reason } where kind is charge, scam, adult or medium.
+  function flag(el, f) {
+    const level = f.kind === 'medium' ? 'medium' : 'high';
     const chip = document.createElement('span');
-    chip.className = 'ocf-chip ocf-' + result.tier;
-    chip.textContent = result.tier === 'high' ? 'high charge' : 'charged';
-    chip.title = 'Emotional charge ' + result.score + '/100 (' + describe(result) +
-      '). Word-list heuristic, not a verdict. Click to dispute and remove.';
+    chip.className = 'ocf-chip ocf-' + level;
+    chip.textContent = CHIP_TEXT[f.kind];
+    chip.title = f.reason.charAt(0).toUpperCase() + f.reason.slice(1) +
+      '. Word-list heuristic, not a verdict. Click to dispute and remove.';
     chip.setAttribute('role', 'button');
     chip.tabIndex = 0;
-    const action = result.tier === 'high' ? settings.highAction : 'label';
+    const action = level === 'high' ? settings.highAction : 'label';
     const dispute = async (e) => {
       e.preventDefault();
       e.stopPropagation();
       chip.remove();
       el.classList.remove('ocf-blur');
-      state[result.tier] -= 1;
+      state.counts[f.kind] -= 1;
       renderPanel();
       const { disputes = 0 } = await chrome.storage.local.get('disputes');
       chrome.storage.local.set({ disputes: disputes + 1 });
     };
     chip.addEventListener('click', dispute);
     chip.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') dispute(e); });
+    state.counts[f.kind] += 1;
     if (action === 'hide') {
-      cover(el, 'Hidden: high emotional charge (' + describeCategories(result.hits) + ').',
-        () => el.appendChild(chip));
+      cover(el, 'Hidden: ' + f.reason + '.', () => el.appendChild(chip));
     } else {
       if (action === 'blur') el.classList.add('ocf-blur');
       el.appendChild(chip);
@@ -126,13 +125,42 @@
       const text = (el.innerText || '').trim().slice(0, 2000);
       if (text.length < 20) continue;
       state.scanned += 1;
-      const result = scoreEmotion(text);
-      if (result.tier === 'high' || (result.tier === 'medium' && settings.showMedium)) {
-        state[result.tier] += 1;
-        flag(el, result);
+      const c = classify(text);
+      if (c.kind) {
+        flag(el, c);
+      } else if (c.emotion.tier === 'medium' && settings.showMedium) {
+        flag(el, {
+          kind: 'medium',
+          reason: 'emotional charge ' + c.emotion.score + '/100 (' + describeCategories(c.emotion.hits) + ')',
+        });
       }
     }
+    scanAiLabels(root);
     if (settings.readImageLabels) scanImages(root);
+  }
+
+  // ---------- declared labels: "AI-generated" badges shown by the site ----------
+
+  // Finds short text that is, in full, an AI label (for example "AI info").
+  // If it sits inside a post, the post is treated as labelled AI-generated.
+  function scanAiLabels(root) {
+    if (state.aiLabels >= MAX_AI_LABELS || !root.isConnected) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode()) && state.aiLabels < MAX_AI_LABELS) {
+      const value = node.nodeValue;
+      if (value.length < 5 || value.length > 80 || !isAiLabel(value)) continue;
+      const el = node.parentElement;
+      if (!el || seen.has(el) || el.closest('.ocf-chip, .ocf-cover, script, style, #ocf-panel-host')) continue;
+      seen.add(el);
+      state.aiLabels += 1;
+      const post = el.closest('article, [role="article"]');
+      addSignal('Origin', 'ailabel-' + state.aiLabels,
+        'Labelled “' + value.trim() + '” by the site.', '', post || el);
+      if (post && settings.highAction === 'hide' && !post.classList.contains('ocf-hidden')) {
+        cover(post, 'Hidden: post labelled AI-generated.');
+      }
+    }
   }
 
   // ---------- declared labels: images ----------
@@ -246,7 +274,8 @@
 
   function renderPanel() {
     if (dismissed) return;
-    const total = state.high + state.medium + state.signals.size;
+    const n = state.counts;
+    const total = n.charge + n.scam + n.adult + n.medium + state.signals.size;
     if (!total) { if (host) host.remove(); host = null; return; }
     if (!host) {
       host = document.createElement('div');
@@ -296,8 +325,13 @@
     }
 
     const byGroup = new Map(GROUPS.map((g) => [g, []]));
-    if (state.high) byGroup.get('Emotional charge').push({ label: state.high + ' high-charge passage' + (state.high === 1 ? '' : 's') + '.' });
-    if (state.medium) byGroup.get('Emotional charge').push({ label: state.medium + ' medium-charge passage' + (state.medium === 1 ? '' : 's') + '.' });
+    const count = (group, k, name) => {
+      if (n[k]) byGroup.get(group).push({ label: n[k] + ' ' + name + ' passage' + (n[k] === 1 ? '' : 's') + '.' });
+    };
+    count('Scam and adult', 'scam', 'scam-style');
+    count('Scam and adult', 'adult', 'adult-content');
+    count('Emotional charge', 'charge', 'high-charge');
+    count('Emotional charge', 'medium', 'medium-charge');
     for (const s of state.signals.values()) byGroup.get(s.group).push(s);
 
     for (const [group, items] of byGroup) {

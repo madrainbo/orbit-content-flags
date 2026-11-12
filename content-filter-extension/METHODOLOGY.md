@@ -1,6 +1,6 @@
-# Methodology (v0.2)
+# Methodology (v0.5)
 
-Published so the thresholds can be criticised. Every number here is a starting choice, not a validated benchmark. The code is in `core/scoring.js`, `core/labels.js` and `content.js`.
+Published so the thresholds can be criticised. Every number here is a starting choice, not a validated benchmark. The code is in `core/scoring.js`, `core/labels.js` and `content.js`; the phrase patterns are in `shared/patterns.json`, from which the JavaScript and Kotlin tables are generated.
 
 ## Emotional charge
 
@@ -26,6 +26,25 @@ The lexicon is about 50 English stems in three groups (outrage, fear, bait). It 
 **What happens to a `high` passage:** by default it is hidden behind a notice with a Show button; settings can change this to blur or label only. `medium` passages are never hidden.
 
 **What a tier does not mean:** that the text is false, manipulative or low quality. Accurate reporting on a disaster will often score high. Known false positives include sports ("slam dunk") and quoted speech.
+
+## Scam-style and adult wording
+
+Each passage is checked against two lists of phrase patterns in `shared/patterns.json`. Every pattern has a weight of 1 or 2, and a passage is flagged when the weights of the distinct patterns it matches add up to **2 or more**. So one strong phrase is enough ("claim your prize", "verify your account"), while a weak one on its own is not ("congratulations", "act now", "nude").
+
+| Kind | Patterns | Examples of weight 2 | Examples of weight 1 |
+|---|---|---|---|
+| Scam-style | 30 | "you've won", "account has been suspended", "double your bitcoin", "pay with gift cards" | "congratulations", "act now", "wire transfer", "work from home" |
+| Adult | 14 | explicit site and content terms | "18+", "adults only", "nude" |
+
+If a passage qualifies for more than one kind, adult wins over scam-style, which wins over high emotional charge. The reason shown for scam-style passages quotes up to two matched phrases; the reason for adult passages never repeats the matched words.
+
+**What these do not mean:** that a message is fraudulent or that content is explicit. The lists are English-only starting choices, not validated against labelled data. Legitimate security notices, real prize draws and job adverts use the same phrases; sexual-health and art writing can trigger the adult list. Images and video are never inspected.
+
+## "AI-generated" badges
+
+A short piece of text (60 characters or fewer) is treated as an AI label only if the **whole** text is one of a fixed set of badge wordings, such as "AI-generated", "AI info", "Made with AI", "Creator labeled as AI-generated" or "Altered or synthetic content". Prose that mentions AI-generated content does not match. In the browser, if the badge sits inside an `article` element, that post is hidden; otherwise it is only listed.
+
+This reports a label someone else applied. It does not detect AI content, and the absence of a badge says nothing.
 
 ## Draining design
 
