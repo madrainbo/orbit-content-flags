@@ -13,6 +13,8 @@ function render() {
   const p = JSON.parse(fs.readFileSync(SRC, 'utf8'));
   for (const list of [p.scam, p.adult, p.hook]) for (const e of list) new RegExp(e.re, 'i'); // must compile
   new RegExp(p.aiLabel, 'i');
+  const stageIds = Object.keys(p.stages).filter((k) => !k.startsWith('_'));
+  for (const id of stageIds) for (const re of p.stages[id].re) new RegExp(re, 'i');
 
   const jsList = (list) => list.map((e) => `    [${JSON.stringify(e.re)}, ${e.w}],`).join('\n');
   const js = `// GENERATED from shared/patterns.json by test/gen-patterns.js. Do not edit.
@@ -62,6 +64,18 @@ ${ktList(p.hook)}
     )
 
     val AI_LABEL = Regex(${kt(p.aiLabel)}, RegexOption.IGNORE_CASE)
+
+    /** A stage of a long-running scam; [money] marks stages that involve money. */
+    class Stage(val id: String, val label: String, val money: Boolean, val patterns: List<Regex>)
+
+    private fun S(id: String, label: String, money: Boolean, vararg re: String) =
+        Stage(id, label, money, re.map { Regex(it, RegexOption.IGNORE_CASE) })
+
+    val STAGES = listOf(
+${stageIds.map((id) => `        S(${JSON.stringify(id)}, ${JSON.stringify(p.stages[id].label)}, ${p.stages[id].money},
+${p.stages[id].re.map((r) => '            ' + kt(r) + ',').join('\n')}
+        ),`).join('\n')}
+    )
 }
 `;
   return { js, kotlin };

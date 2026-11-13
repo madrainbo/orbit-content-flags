@@ -14,6 +14,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import dev.orbitflags.core.ScamTracker
 import dev.orbitflags.core.Scoring
 
 /**
@@ -26,6 +27,9 @@ class ContentFlagService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var scanPending = false
     private var pill: TextView? = null
+    private var banner: TextView? = null
+    private var bannerKey: String? = null
+    private lateinit var chats: ChatWatch
     private var pillDismissed = false
     private var noticeShowing = false
 
@@ -52,6 +56,7 @@ class ContentFlagService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         connected = true
+        chats = ChatWatch(this)
         vision = ScreenVision(this)
         noticeShowing = true
         showPill("Orbit on-screen flags are on")
@@ -89,6 +94,7 @@ class ContentFlagService : AccessibilityService() {
         connected = false
         handler.removeCallbacksAndMessages(null)
         hidePill()
+        hideBanner()
         setCovers(emptyList())
         vision?.close()
         vision = null
@@ -104,6 +110,7 @@ class ContentFlagService : AccessibilityService() {
             textAiLabel = false
             visionAiLabel = false
             pressure = false
+            hideBanner()
             render()
             return
         }
@@ -111,7 +118,9 @@ class ContentFlagService : AccessibilityService() {
         val passages = ArrayList<Pair<String, Rect>>()
         val images = ArrayList<Rect>()
         val aiLabel = booleanArrayOf(false)
-        collect(root, passages, images, 0, intArrayOf(0), aiLabel)
+        val chat = ChatScreen()
+        collect(root, passages, images, 0, intArrayOf(0), aiLabel, chat)
+        watchChat(pkg, chat, passages.map { it.first })
         pictures = images.sortedByDescending { it.width().toLong() * it.height() }.take(MAX_PICTURES)
 
         val found = ArrayList<Finding>()
@@ -131,7 +140,7 @@ class ContentFlagService : AccessibilityService() {
 
     private fun collect(
         node: AccessibilityNodeInfo, out: MutableList<Pair<String, Rect>>, images: MutableList<Rect>,
-        depth: Int, visited: IntArray, aiLabel: BooleanArray,
+        depth: Int, visited: IntArray, aiLabel: BooleanArray, chat: ChatScreen,
     ) {
         if (depth > MAX_DEPTH || visited[0] >= MAX_NODES) return
         visited[0] += 1
@@ -143,11 +152,18 @@ class ContentFlagService : AccessibilityService() {
                 images.add(bounds)
             }
         }
+        // A message box marks a chat screen; its contents are never read.
+        if (node.isEditable) chat.hasMessageBox = true
         // Never read passwords or what the user is typing.
         if (!node.isPassword && !node.isEditable && node.isVisibleToUser) {
             // Many apps (Instagram, YouTube) put post text in the description, not the text field.
             val text = node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
                 ?: node.contentDescription?.toString()?.trim()
+            // The first short text near the top of a chat screen is taken as its title.
+            if (chat.title == null && text != null && text.length in 2..40) {
+                val at = Rect().also { node.getBoundsInScreen(it) }
+                if (at.top < screen.top + screen.height() * TITLE_BAND) chat.title = text
+            }
             // Short badges such as "AI info" are labels the app itself displays.
             if (!aiLabel[0] && Scoring.isAiLabel(text)) aiLabel[0] = true
             if (text != null && text.length >= Finding.MIN_CHARS) {
@@ -157,7 +173,96 @@ class ContentFlagService : AccessibilityService() {
         }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            collect(child, out, images, depth + 1, visited, aiLabel)
+            collect(child, out, images, depth + 1, visited, aiLabel, chat)
+        }
+    }
+
+    private class ChatScreen {
+        var hasMessageBox = false
+        var title: String? = null
+    }
+
+    /**
+     * Follows long-running scam stages in chat screens. Only stage markers are
+     * stored, under a one-way hash of the app and chat title.
+     */
+    private fun watchChat(pkg: String, chat: ChatScreen, texts: List<String>) {
+        val sample = pkg == packageName
+        if (!Prefs.watchChats(this) || !chat.hasMessageBox || !(sample || pkg in ChatWatch.CHAT_APPS)) {
+            hideBanner()
+            return
+        }
+        val now = System.currentTimeMillis()
+        val key = ScamTracker.conversationKey(pkg, chat.title ?: "")
+        // This app's own sample is never stored.
+        val before = if (sample) sampleState else chats.load(key)
+        val after = ScamTracker.observe(before, texts, now)
+        if (after !== before) {
+            if (sample) sampleState = after else chats.save(key, after)
+        }
+        if (sample && ScamTracker.stagesIn(texts).isEmpty()) sampleState = ScamTracker.State()
+        val assessment = ScamTracker.assess(if (sample) sampleState else after, now)
+        if (assessment.warn) {
+            showBanner(key, sample, ScamTracker.describe(assessment) +
+                " Do not send money or share codes. Tap to hide this for a week.")
+        } else {
+            hideBanner()
+        }
+    }
+
+    private var sampleState = ScamTracker.State()
+
+    private fun showBanner(key: String, sample: Boolean, text: String) {
+        val existing = banner
+        if (existing != null && bannerKey == key) {
+            if (existing.text.toString() != text) existing.text = text
+            return
+        }
+        hideBanner()
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = 14f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(dp(14f), dp(10f), dp(14f), dp(10f))
+            background = GradientDrawable().apply {
+                setColor(0xFFA12B1E.toInt())
+                cornerRadius = dp(10f).toFloat()
+            }
+            setOnClickListener {
+                val now = System.currentTimeMillis()
+                if (sample) sampleState = ScamTracker.dismiss(sampleState, now)
+                else chats.save(key, ScamTracker.dismiss(chats.load(key), now))
+                hideBanner()
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP
+            y = dp(64f)
+            horizontalMargin = 0.03f
+        }
+        try {
+            windowManager().addView(view, params)
+            banner = view
+            bannerKey = key
+        } catch (e: WindowManager.BadTokenException) {
+            // The service is shutting down; nothing to show.
+        }
+    }
+
+    private fun hideBanner() {
+        val view = banner ?: return
+        banner = null
+        bannerKey = null
+        try {
+            windowManager().removeView(view)
+        } catch (e: IllegalArgumentException) {
+            // Already detached.
         }
     }
 
@@ -207,10 +312,10 @@ class ContentFlagService : AccessibilityService() {
     private fun overlayRects(): List<Rect> {
         val rects = ArrayList<Rect>()
         for (view in covers.values) (view.tag as? Rect)?.let { rects.add(it) }
-        pill?.let { p ->
+        for (view in listOfNotNull(pill, banner)) {
             val at = IntArray(2)
-            p.getLocationOnScreen(at)
-            rects.add(Rect(at[0], at[1], at[0] + p.width, at[1] + p.height))
+            view.getLocationOnScreen(at)
+            rects.add(Rect(at[0], at[1], at[0] + view.width, at[1] + view.height))
         }
         return rects
     }
@@ -394,6 +499,8 @@ class ContentFlagService : AccessibilityService() {
         private const val MAX_REVEALED = 200
         /** A cover never takes more than this share of the screen. */
         private const val MAX_COVER_SHARE = 0.7
+        /** A chat's title is looked for in this top share of the screen. */
+        private const val TITLE_BAND = 0.16
         private const val MAX_PICTURES = 8
         private const val MIN_PICTURE_DP = 96f
         /** Accessibility class names used for pictures and video, in apps and in browsers. */

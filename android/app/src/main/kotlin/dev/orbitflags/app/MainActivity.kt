@@ -21,6 +21,7 @@ import dev.orbitflags.core.Domains
 class MainActivity : Activity() {
     private lateinit var flagsStatus: TextView
     private lateinit var visionStatus: TextView
+    private lateinit var chatStatus: TextView
     private lateinit var flagsButton: Button
     private lateinit var dnsButton: Button
     private lateinit var blockInput: EditText
@@ -91,7 +92,7 @@ class MainActivity : Activity() {
         })
         visionStatus = body("")
         body("Most screens produce no flag. To check it is working, show the sample below: " +
-            "four samples, the last one a picture of text, should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again.").setPadding(0, dp(12), 0, 0)
+            "the charged, scam-style and adult samples and the picture of text should each be covered by a \"Hidden\" notice within a second, and tapping a notice shows that sample again. The three sample chat lines should bring up a red long-running scam warning at the top.").setPadding(0, dp(12), 0, 0)
         val samples = SAMPLES.map { text ->
             body(text).apply {
                 visibility = View.GONE
@@ -115,6 +116,21 @@ class MainActivity : Activity() {
         }
         // Lets automated tests reveal the sample without tapping.
         if (intent.getBooleanExtra("show_sample", false)) sampleButton.performClick()
+
+        heading("Long-running scams")
+        body("In messaging and dating apps, the app follows the stages of investment and romance scams across a chat " +
+            "over days or weeks, and warns when several have appeared. It stores only which stages were seen and " +
+            "when, under a scrambled identifier. Messages and names are never stored.")
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Watch chats for long-running scam patterns"
+            isChecked = Prefs.watchChats(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setWatchChats(this@MainActivity, checked) }
+        })
+        chatStatus = body("")
+        button("Clear stored markers") {
+            ChatWatch(this).clear()
+            refresh()
+        }
 
         heading("Blocked domains")
         body("One domain per line; subdomains are included. Allow beats block.")
@@ -171,6 +187,8 @@ class MainActivity : Activity() {
         }
         flagsButton.text = if (on) "Open accessibility settings" else "Turn on on-screen flags"
         dnsButton.text = if (DnsFilterService.running) "Stop domain blocking" else "Start domain blocking"
+        val chats = ChatWatch(this).count()
+        chatStatus.text = if (chats == 1) "Markers stored for 1 chat." else "Markers stored for $chats chats."
         val summary = ScreenVision.lastSummary
         visionStatus.text = if (summary == null) {
             "No screen check has run yet."
@@ -251,6 +269,9 @@ class MainActivity : Activity() {
             "Sample: Congratulations! You have been selected. Click here to claim your prize.",
             "Sample: Hot singles in your area want to chat. 18+ only, uncensored live cams.",
             "AI info",
+            "Sample chat: This app is not convenient, add me on Telegram.",
+            "Sample chat: My uncle is a senior analyst, I can teach you to trade crypto.",
+            "Sample chat: The minimum deposit is 500. Your account is frozen until you pay the tax to withdraw.",
         )
     }
 }

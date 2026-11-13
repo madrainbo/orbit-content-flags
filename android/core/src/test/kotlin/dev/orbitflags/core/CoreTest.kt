@@ -121,3 +121,85 @@ class DnsPacketTest {
         assertContentEquals(dns, reply.copyOfRange(28, reply.size))
     }
 }
+
+class ScamTrackerTest {
+    private val day = ScamTracker.DAY_MS
+    private val t0 = 1_800_000_000_000L
+
+    @Test
+    fun findsStagesInChatText() {
+        assertEquals(setOf("contact"), ScamTracker.stagesIn(listOf("Sorry, I think I have the wrong number. Is this Mr Chen?")))
+        assertEquals(setOf("move"), ScamTracker.stagesIn(listOf("This app is not convenient, add me on Telegram")))
+        assertEquals(setOf("invest"), ScamTracker.stagesIn(listOf("My uncle is a senior analyst and gives me insider tips")))
+        assertEquals(setOf("deposit"), ScamTracker.stagesIn(listOf("The minimum deposit is 500, send the USDT to this wallet address")))
+        assertEquals(setOf("fee"), ScamTracker.stagesIn(listOf("Your account is frozen. You must pay the tax to withdraw.")))
+        assertEquals(setOf("plea"), ScamTracker.stagesIn(listOf("I am stuck at customs, can you send me some money? I will pay you back")))
+        assertEquals(setOf("secrecy"), ScamTracker.stagesIn(listOf("Don't tell your family about this yet")))
+        assertEquals(emptySet(), ScamTracker.stagesIn(listOf("Are we still on for dinner on Friday? I booked the table for eight.")))
+        assertEquals(emptySet(), ScamTracker.stagesIn(listOf("Can you pick up milk on the way home?", "Running ten minutes late")))
+    }
+
+    @Test
+    fun warnsOnlyWhenSeveralStagesIncludeMoney() {
+        var s = ScamTracker.State()
+        s = ScamTracker.observe(s, listOf("Nice to meet you, I found your profile"), t0)
+        s = ScamTracker.observe(s, listOf("Good morning my dear, have you eaten?"), t0 + 2 * day)
+        assertFalse(ScamTracker.assess(s, t0 + 2 * day).warn, "two stages")
+        s = ScamTracker.observe(s, listOf("Let's continue on WhatsApp"), t0 + 5 * day)
+        assertFalse(ScamTracker.assess(s, t0 + 5 * day).warn, "three stages but no money involved")
+        s = ScamTracker.observe(s, listOf("I can teach you to trade, the returns are guaranteed returns every day"), t0 + 9 * day)
+        val a = ScamTracker.assess(s, t0 + 9 * day)
+        assertTrue(a.warn)
+        assertEquals(9, a.spanDays)
+        assertEquals(listOf(9, 7, 4, 0), a.stages.map { it.daysAgo })
+        assertTrue(ScamTracker.describe(a).contains("investment or crypto talk (today)"))
+        assertTrue(ScamTracker.describe(a).contains("contact from a stranger (9 days ago)"))
+    }
+
+    @Test
+    fun ordinaryMoneyTalkAloneDoesNotWarn() {
+        var s = ScamTracker.State()
+        s = ScamTracker.observe(s, listOf("I did a bank transfer for the rent", "Thinking about crypto trading lately"), t0)
+        val a = ScamTracker.assess(s, t0)
+        assertEquals(2, a.stages.size)
+        assertFalse(a.warn)
+    }
+
+    @Test
+    fun dismissQuietensThenExpires() {
+        var s = ScamTracker.observe(ScamTracker.State(),
+            listOf("add me on telegram", "crypto trading platform", "minimum deposit"), t0)
+        assertTrue(ScamTracker.assess(s, t0).warn)
+        s = ScamTracker.dismiss(s, t0)
+        assertFalse(ScamTracker.assess(s, t0 + 6 * day).warn)
+        assertTrue(ScamTracker.assess(s, t0 + 8 * day).warn)
+    }
+
+    @Test
+    fun forgetsOldMarkersAndRoundTripsStorage() {
+        val s = ScamTracker.observe(ScamTracker.State(),
+            listOf("add me on telegram", "crypto trading platform", "minimum deposit"), t0)
+        assertFalse(ScamTracker.assess(s, t0 + ScamTracker.RETENTION_MS + day).warn)
+        val text = ScamTracker.encode(ScamTracker.dismiss(s, t0))
+        assertFalse(text.contains("telegram", ignoreCase = true), "no message text is stored")
+        assertEquals(ScamTracker.dismiss(s, t0), ScamTracker.decode(text))
+        assertEquals(ScamTracker.State(), ScamTracker.decode(""))
+        assertEquals(ScamTracker.State(), ScamTracker.decode("garbage"))
+    }
+
+    @Test
+    fun rereadingTheSameScreenDoesNotRewrite() {
+        val s = ScamTracker.observe(ScamTracker.State(), listOf("minimum deposit"), t0)
+        assertTrue(ScamTracker.observe(s, listOf("minimum deposit"), t0 + 60_000) === s)
+        assertTrue(ScamTracker.observe(s, listOf("hello there"), t0 + 2 * day) === s)
+    }
+
+    @Test
+    fun conversationKeyHidesNames() {
+        val k = ScamTracker.conversationKey("com.whatsapp", "Alex Example")
+        assertEquals(24, k.length)
+        assertFalse(k.contains("alex", ignoreCase = true))
+        assertEquals(k, ScamTracker.conversationKey("com.whatsapp", " alex example "))
+        assertTrue(k != ScamTracker.conversationKey("org.telegram.messenger", "Alex Example"))
+    }
+}

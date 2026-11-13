@@ -36,6 +36,14 @@ object Prefs {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("check_pictures", value).apply()
     }
 
+    /** Whether chat screens are watched for long-running scam stages (default on). */
+    fun watchChats(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("watch_chats", true)
+
+    fun setWatchChats(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("watch_chats", value).apply()
+    }
+
     fun save(context: Context, block: List<String>, allow: List<String>) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString("block", block.joinToString("\n"))
