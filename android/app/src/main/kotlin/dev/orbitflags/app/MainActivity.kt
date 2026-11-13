@@ -22,6 +22,7 @@ class MainActivity : Activity() {
     private lateinit var flagsStatus: TextView
     private lateinit var visionStatus: TextView
     private lateinit var chatStatus: TextView
+    private lateinit var modelStatus: TextView
     private lateinit var flagsButton: Button
     private lateinit var dnsButton: Button
     private lateinit var blockInput: EditText
@@ -80,6 +81,12 @@ class MainActivity : Activity() {
             isChecked = Prefs.hideFlagged(this@MainActivity)
             setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
         })
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Use the text model to catch reworded scams, bait and adult posts"
+            isChecked = Prefs.useTextModel(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setUseTextModel(this@MainActivity, checked) }
+        })
+        modelStatus = body("")
         column.addView(android.widget.CheckBox(this).apply {
             text = "Capture the screen to read text inside images (stays on this device)"
             isChecked = Prefs.readImages(this@MainActivity)
@@ -187,6 +194,11 @@ class MainActivity : Activity() {
         }
         flagsButton.text = if (on) "Open accessibility settings" else "Turn on on-screen flags"
         dnsButton.text = if (DnsFilterService.running) "Stop domain blocking" else "Start domain blocking"
+        modelStatus.text = when {
+            !ContentFlagService.connected -> "Text model: starts with on-screen flags."
+            ContentFlagService.textModelRunning -> "Text model: running."
+            else -> "Text model: not available on this device; the phrase rules still apply."
+        }
         val chats = ChatWatch(this).count()
         chatStatus.text = if (chats == 1) "Markers stored for 1 chat." else "Markers stored for $chats chats."
         val summary = ScreenVision.lastSummary
@@ -267,6 +279,7 @@ class MainActivity : Activity() {
             "Sample chat: This app is not convenient, add me on Telegram.",
             "Sample chat: My uncle is a senior analyst, I can teach you to trade crypto.",
             "Sample chat: The minimum deposit is 500. Your account is frozen until you pay the tax to withdraw.",
+            "Your tax rebate is ready. Enter card details so we can deposit it",
             "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
                 "disaster!!! Hurry! Only 3 left in stock.",
             "Sample: Congratulations! You have been selected. Click here to claim your prize.",

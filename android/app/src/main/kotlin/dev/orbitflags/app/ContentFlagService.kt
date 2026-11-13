@@ -44,6 +44,9 @@ class ContentFlagService : AccessibilityService() {
     private var pressure = false
 
     private var vision: ScreenVision? = null
+    private var textModel: TextModel? = null
+    /** Passages the text model is fairly, but not very, sure about: mentioned, not hidden. */
+    private var possible = 0
     private var visionFindings: List<Finding> = emptyList()
     private var visionAiLabel = false
     private var capturing = false
@@ -58,6 +61,14 @@ class ContentFlagService : AccessibilityService() {
         connected = true
         chats = ChatWatch(this)
         vision = ScreenVision(this)
+        // A missing native library (for example on x86 devices) must not stop the service.
+        textModel = try {
+            TextModel(this)
+        } catch (e: Throwable) {
+            android.util.Log.d("OrbitTextModel", "text model unavailable: " + e.javaClass.simpleName)
+            null
+        }
+        textModelRunning = textModel != null
         noticeShowing = true
         showPill("Orbit on-screen flags are on")
         handler.postDelayed({
@@ -98,6 +109,8 @@ class ContentFlagService : AccessibilityService() {
         setCovers(emptyList())
         vision?.close()
         vision = null
+        textModel?.close()
+        textModel = null
         super.onDestroy()
     }
 
@@ -110,6 +123,7 @@ class ContentFlagService : AccessibilityService() {
             textAiLabel = false
             visionAiLabel = false
             pressure = false
+            possible = 0
             hideBanner()
             render()
             return
@@ -125,11 +139,37 @@ class ContentFlagService : AccessibilityService() {
 
         val found = ArrayList<Finding>()
         val seen = HashSet<String>()
+        val unflagged = ArrayList<Pair<String, Rect>>()
         for ((text, bounds) in passages) {
             if (!seen.add(text)) continue
             val c = Scoring.classify(text)
-            val kind = c.kind ?: continue
-            found.add(Finding("t:$text", bounds, kind, c.reason))
+            val kind = c.kind
+            if (kind != null) found.add(Finding("t:$text", bounds, kind, c.reason)) else unflagged.add(text to bounds)
+        }
+        // Passages the rules let through are judged as a whole by the text model.
+        possible = 0
+        val model = textModel
+        if (model != null && Prefs.useTextModel(this)) {
+            val verdicts = model.lookup(unflagged.map { it.first }) {
+                handler.post {
+                    if (connected && !scanPending) {
+                        scanPending = true
+                        handler.postDelayed({
+                            scanPending = false
+                            scan()
+                        }, SCAN_DELAY_MS)
+                    }
+                }
+            }
+            for ((text, bounds) in unflagged) {
+                val v = verdicts[text] ?: continue
+                if (v.hide) {
+                    found.add(Finding("t:$text", bounds, v.kind,
+                        (TextModel.REASONS[v.kind] ?: "flagged") + " (text model, ${(v.confidence * 100).toInt()}% sure)"))
+                } else {
+                    possible += 1
+                }
+            }
         }
         textFindings = found
         textAiLabel = aiLabel[0]
@@ -341,6 +381,7 @@ class ContentFlagService : AccessibilityService() {
             if (n > 0) parts.add("$n $name")
         }
         if (toCover.isNotEmpty()) parts.add("${toCover.size} hidden")
+        if (possible > 0) parts.add("$possible possibly flagged")
         if (textAiLabel || visionAiLabel) parts.add("AI label on screen")
         if (pressure) parts.add("pressure wording")
         if (parts.isEmpty() || pillDismissed) hidePill() else showPill(parts.joinToString(" · "))
@@ -487,6 +528,11 @@ class ContentFlagService : AccessibilityService() {
         /** True while Android has this service bound and running. */
         @Volatile
         var connected = false
+            private set
+
+        /** True if the bundled text model loaded on this device. */
+        @Volatile
+        var textModelRunning = false
             private set
 
         private const val NOTICE_MS = 4000L

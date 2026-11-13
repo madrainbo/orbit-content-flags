@@ -28,7 +28,7 @@ class ScreenVision(private val service: AccessibilityService) {
     /** Null if the model could not be loaded; text is still read. */
     private val classifier: ImageClassifier? = try {
         ImageClassifier(service)
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
         Log.d(TAG, "image model unavailable: " + e.javaClass.simpleName)
         null
     }
