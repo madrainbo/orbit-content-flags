@@ -264,14 +264,14 @@ class MainActivity : Activity() {
     private companion object {
         const val REQUEST_VPN = 1
         val SAMPLES = listOf(
+            "Sample chat: This app is not convenient, add me on Telegram.",
+            "Sample chat: My uncle is a senior analyst, I can teach you to trade crypto.",
+            "Sample chat: The minimum deposit is 500. Your account is frozen until you pay the tax to withdraw.",
             "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
                 "disaster!!! Hurry! Only 3 left in stock.",
             "Sample: Congratulations! You have been selected. Click here to claim your prize.",
             "Sample: Hot singles in your area want to chat. 18+ only, uncensored live cams.",
             "AI info",
-            "Sample chat: This app is not convenient, add me on Telegram.",
-            "Sample chat: My uncle is a senior analyst, I can teach you to trade crypto.",
-            "Sample chat: The minimum deposit is 500. Your account is frozen until you pay the tax to withdraw.",
         )
     }
 }
