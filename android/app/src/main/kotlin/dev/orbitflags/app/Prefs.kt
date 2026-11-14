@@ -52,6 +52,22 @@ object Prefs {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("text_model", value).apply()
     }
 
+    /** Whether less certain "possible" flags are covered too (default on). */
+    fun hidePossible(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("hide_possible", true)
+
+    fun setHidePossible(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("hide_possible", value).apply()
+    }
+
+    /** Where the user left a draggable overlay. */
+    fun position(context: Context, key: String, default: Int): Int =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getInt(key, default)
+
+    fun setPosition(context: Context, key: String, value: Int) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putInt(key, value).apply()
+    }
+
     fun save(context: Context, block: List<String>, allow: List<String>) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString("block", block.joinToString("\n"))

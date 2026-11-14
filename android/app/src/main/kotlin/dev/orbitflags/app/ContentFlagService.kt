@@ -11,6 +11,9 @@ import android.os.SystemClock
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -311,8 +314,12 @@ class ContentFlagService : AccessibilityService() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP
-            y = dp(64f)
+            y = Prefs.position(this@ContentFlagService, "banner_y", dp(64f))
             horizontalMargin = 0.03f
+        }
+        // The warning can be dragged up or down, out of the way of what it covers.
+        makeDraggable(view, params, moveX = 0, moveY = 1) { _, y ->
+            Prefs.setPosition(this, "banner_y", y)
         }
         try {
             windowManager().addView(view, params)
@@ -399,7 +406,9 @@ class ContentFlagService : AccessibilityService() {
         if (record) FlagLog.record(appInFront, all + possible, screenEntities, System.currentTimeMillis())
         val screenArea = screen.width().toLong() * screen.height()
         val hide = Prefs.hideFlagged(this)
-        val toCover = if (!hide) emptyList() else all.filter { f ->
+        // Less certain "possible" flags are covered as well, unless the user turned that off.
+        val candidates = if (Prefs.hidePossible(this)) dropNested(all + possible) else all
+        val toCover = if (!hide) emptyList() else candidates.filter { f ->
             // Text covers stay small; a flagged picture is covered whatever its size.
             f.key !in revealed && (f.key.startsWith("i:") ||
                 f.bounds.width().toLong() * f.bounds.height() <= screenArea * MAX_COVER_SHARE)
@@ -473,12 +482,12 @@ class ContentFlagService : AccessibilityService() {
                 gravity = Gravity.CENTER
                 maxLines = 3
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(0xFF1A1A1A.toInt())
+                // Black with white text: clearly a cover, and readable over any app.
+                setTextColor(0xFFFFFFFF.toInt())
                 setPadding(dp(8f), dp(2f), dp(8f), dp(2f))
                 background = GradientDrawable().apply {
-                    setColor(0xFFFFFFFF.toInt())
+                    setColor(0xFF000000.toInt())
                     cornerRadius = dp(6f).toFloat()
-                    setStroke(dp(1f), 0xFFA12B1E.toInt())
                 }
                 tag = Rect(finding.bounds)
                 setOnClickListener {
@@ -548,14 +557,83 @@ class ContentFlagService : AccessibilityService() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.END
-            x = dp(16f)
-            y = dp(96f)
+            x = Prefs.position(this@ContentFlagService, "pill_x", dp(16f))
+            y = Prefs.position(this@ContentFlagService, "pill_y", dp(96f))
+        }
+        // The pill can be dragged anywhere; it stays where it is left. Measured from the
+        // bottom-right corner, so dragging left or up increases x or y.
+        makeDraggable(view, params, moveX = -1, moveY = -1) { x, y ->
+            Prefs.setPosition(this, "pill_x", x)
+            Prefs.setPosition(this, "pill_y", y)
         }
         try {
             windowManager().addView(view, params)
             pill = view
         } catch (e: WindowManager.BadTokenException) {
             // The service is shutting down; nothing to show.
+        }
+    }
+
+    /**
+     * Lets an overlay be dragged with a finger. [moveX] and [moveY] say how a
+     * drag right or down changes the overlay's x and y (1, -1, or 0 to lock
+     * that direction). A touch that does not move still works as a tap, and
+     * holding still works as a long press.
+     */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun makeDraggable(
+        view: View, params: WindowManager.LayoutParams, moveX: Int, moveY: Int, onMoved: (Int, Int) -> Unit,
+    ) {
+        val slop = ViewConfiguration.get(this).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+        var held = false
+        val hold = Runnable {
+            if (!dragging) {
+                held = true
+                view.performLongClick()
+            }
+        }
+        view.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX
+                    downY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    dragging = false
+                    held = false
+                    handler.postDelayed(hold, ViewConfiguration.getLongPressTimeout().toLong())
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    if (!dragging && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) {
+                        dragging = true
+                        handler.removeCallbacks(hold)
+                    }
+                    if (dragging && !held) {
+                        val maxX = maxOf(0, screen.width() - view.width)
+                        val maxY = maxOf(0, screen.height() - view.height)
+                        params.x = (startX + moveX * dx.toInt()).coerceIn(0, maxX)
+                        params.y = (startY + moveY * dy.toInt()).coerceIn(0, maxY)
+                        try {
+                            windowManager().updateViewLayout(view, params)
+                        } catch (e: IllegalArgumentException) {
+                            // The overlay was removed mid-drag.
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(hold)
+                    if (dragging) onMoved(params.x, params.y) else if (!held) view.performClick()
+                }
+                MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(hold)
+            }
+            true
         }
     }
 

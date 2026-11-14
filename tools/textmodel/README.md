@@ -11,7 +11,7 @@ Judges a passage as a whole, so reworded scams, engagement bait, adult posts and
 | Confidence | What the app does |
 |---|---|
 | 0.9 or more | Treats it like a rule match: covered, with the reason and confidence shown |
-| 0.75 to 0.9 | Listed as "possible" on the flags screen and counted in the pill; not covered |
+| 0.75 to 0.9 | Listed as "possible" on the flags screen and counted in the pill; covered too unless the user turns that off |
 | below 0.75 | Nothing |
 
 The model only judges passages of at least six words and 30 characters, and never sees control labels (see `UiChrome` in `android/core`).

@@ -83,6 +83,11 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> Prefs.setHideFlagged(this@MainActivity, checked) }
         })
         column.addView(android.widget.CheckBox(this).apply {
+            text = "Also hide possible flags (less certain; expect more ordinary posts to be hidden)"
+            isChecked = Prefs.hidePossible(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setHidePossible(this@MainActivity, checked) }
+        })
+        column.addView(android.widget.CheckBox(this).apply {
             text = "Use the text model to catch reworded scams, bait and adult posts"
             isChecked = Prefs.useTextModel(this@MainActivity)
             setOnCheckedChangeListener { _, checked -> Prefs.setUseTextModel(this@MainActivity, checked) }
@@ -204,7 +209,7 @@ class MainActivity : Activity() {
         flagsStatus.text = if (on && !ContentFlagService.connected) {
             "Enabled in settings but not running yet. If this does not change, turn it off and on again in accessibility settings."
         } else if (on) {
-            "On. Scam-style, adult, engagement-bait and highly charged text in other apps is covered until you tap it, and a small pill summarises what was found."
+            "On. Scam-style, adult, engagement-bait and highly charged text in other apps is covered until you tap it, and a small pill summarises what was found. Tap the pill for details, drag it to move it, press and hold to hide it."
         } else {
             "Off. When on, the app reads text shown in other apps to score it."
         }
