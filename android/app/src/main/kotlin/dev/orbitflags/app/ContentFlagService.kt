@@ -1,6 +1,7 @@
 package dev.orbitflags.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
@@ -14,6 +15,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import dev.orbitflags.core.Entities
 import dev.orbitflags.core.ScamTracker
 import dev.orbitflags.core.Scoring
 
@@ -45,8 +47,11 @@ class ContentFlagService : AccessibilityService() {
 
     private var vision: ScreenVision? = null
     private var textModel: TextModel? = null
-    /** Passages the text model is fairly, but not very, sure about: mentioned, not hidden. */
-    private var possible = 0
+    /** Passages the text model is fairly, but not very, sure about: listed, not hidden. */
+    private var possible: List<Finding> = emptyList()
+    private var screenEntities: List<Entities.Entity> = emptyList()
+    private var appInFront = ""
+    private val appNames = HashMap<String, String>()
     private var visionFindings: List<Finding> = emptyList()
     private var visionAiLabel = false
     private var capturing = false
@@ -117,16 +122,24 @@ class ContentFlagService : AccessibilityService() {
     private fun scan() {
         val root = rootInActiveWindow
         val pkg = root?.packageName?.toString()
-        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES) {
+        // System UI is skipped, and so is this app's own flags screen, which quotes flagged text.
+        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES || FlagsActivity.visible) {
             textFindings = emptyList()
             visionFindings = emptyList()
             textAiLabel = false
             visionAiLabel = false
             pressure = false
-            possible = 0
+            possible = emptyList()
             hideBanner()
-            render()
+            render(record = false)
             return
+        }
+        appInFront = appNames.getOrPut(pkg) {
+            try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) {
+                pkg
+            }
         }
         screen = Rect().also { root.getBoundsInScreen(it) }
         val passages = ArrayList<Pair<String, Rect>>()
@@ -140,14 +153,26 @@ class ContentFlagService : AccessibilityService() {
         val found = ArrayList<Finding>()
         val seen = HashSet<String>()
         val unflagged = ArrayList<Pair<String, Rect>>()
+        val reported = ReportStore.reported(this)
+        val notAProblem = ReportStore.okFingerprints(this)
+        val entities = LinkedHashSet<Entities.Entity>()
         for ((text, bounds) in passages) {
             if (!seen.add(text)) continue
+            if (entities.size < MAX_ENTITIES) entities.addAll(Entities.extract(text))
+            // The user said this exact passage was fine.
+            if (notAProblem.isNotEmpty() && ReportStore.fingerprint("t:$text") in notAProblem) continue
+            val hit = Entities.firstReported(text, reported)
+            if (hit != null) {
+                found.add(Finding("t:$text", bounds, "reported", "mentions ${hit.display}, which you reported"))
+                continue
+            }
             val c = Scoring.classify(text)
             val kind = c.kind
             if (kind != null) found.add(Finding("t:$text", bounds, kind, c.reason)) else unflagged.add(text to bounds)
         }
+        screenEntities = entities.take(MAX_ENTITIES)
         // Passages the rules let through are judged as a whole by the text model.
-        possible = 0
+        val maybe = ArrayList<Finding>()
         val model = textModel
         if (model != null && Prefs.useTextModel(this)) {
             val verdicts = model.lookup(unflagged.map { it.first }) {
@@ -163,14 +188,12 @@ class ContentFlagService : AccessibilityService() {
             }
             for ((text, bounds) in unflagged) {
                 val v = verdicts[text] ?: continue
-                if (v.hide) {
-                    found.add(Finding("t:$text", bounds, v.kind,
-                        (TextModel.REASONS[v.kind] ?: "flagged") + " (text model, ${(v.confidence * 100).toInt()}% sure)"))
-                } else {
-                    possible += 1
-                }
+                val reason = (TextModel.REASONS[v.kind] ?: "flagged") + " (text model, ${(v.confidence * 100).toInt()}% sure)"
+                if (v.hide) found.add(Finding("t:$text", bounds, v.kind, reason))
+                else maybe.add(Finding("t:$text", bounds, v.kind, reason, possible = true))
             }
         }
+        possible = maybe
         textFindings = found
         textAiLabel = aiLabel[0]
         pressure = Scoring.urgencySignals(passages.joinToString("\n") { it.first }).isNotEmpty()
@@ -361,10 +384,14 @@ class ContentFlagService : AccessibilityService() {
     }
 
     /** Brings covers and the pill in line with the current findings. */
-    private fun render() {
+    private fun render(record: Boolean = true) {
         // Text read from an image that overlaps a passage already found as text is a duplicate.
-        val fromImages = visionFindings.filter { v -> textFindings.none { overlapsMostly(v.bounds, it.bounds) } }
+        val notAProblem = ReportStore.okFingerprints(this)
+        val fromImages = visionFindings.filter { v ->
+            textFindings.none { overlapsMostly(v.bounds, it.bounds) } && ReportStore.fingerprint(v.key) !in notAProblem
+        }
         val all = dropNested(textFindings + fromImages)
+        if (record) FlagLog.record(appInFront, all + possible, screenEntities, System.currentTimeMillis())
         val screenArea = screen.width().toLong() * screen.height()
         val hide = Prefs.hideFlagged(this)
         val toCover = if (!hide) emptyList() else all.filter { f ->
@@ -381,10 +408,11 @@ class ContentFlagService : AccessibilityService() {
             if (n > 0) parts.add("$n $name")
         }
         if (toCover.isNotEmpty()) parts.add("${toCover.size} hidden")
-        if (possible > 0) parts.add("$possible possibly flagged")
+        if (possible.isNotEmpty()) parts.add("${possible.size} possibly flagged")
         if (textAiLabel || visionAiLabel) parts.add("AI label on screen")
         if (pressure) parts.add("pressure wording")
-        if (parts.isEmpty() || pillDismissed) hidePill() else showPill(parts.joinToString(" · "))
+        if (parts.isEmpty() || pillDismissed) hidePill()
+        else showPill(parts.joinToString(" · ") + " · tap for details")
     }
 
     private fun overlapsMostly(a: Rect, b: Rect): Boolean {
@@ -489,10 +517,22 @@ class ContentFlagService : AccessibilityService() {
                 cornerRadius = dp(16f).toFloat()
                 setStroke(dp(1f), 0xFFA12B1E.toInt())
             }
+            // Tap: what was flagged and why. Press and hold: hide the pill on this screen.
             setOnClickListener {
+                if (noticeShowing) {
+                    noticeShowing = false
+                    hidePill()
+                } else {
+                    FlagLog.freeze()
+                    startActivity(Intent(this@ContentFlagService, FlagsActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+                }
+            }
+            setOnLongClickListener {
                 pillDismissed = true
                 noticeShowing = false
                 hidePill()
+                true
             }
         }
         val params = WindowManager.LayoutParams(
@@ -547,13 +587,14 @@ class ContentFlagService : AccessibilityService() {
         private const val MAX_COVER_SHARE = 0.7
         /** A chat's title is looked for in this top share of the screen. */
         private const val TITLE_BAND = 0.16
+        private const val MAX_ENTITIES = 30
         private const val MAX_PICTURES = 8
         private const val MIN_PICTURE_DP = 96f
         /** Accessibility class names used for pictures and video, in apps and in browsers. */
         private val PICTURE_TYPES = listOf("ImageView", "Image", "VideoView", "TextureView", "SurfaceView")
         private val SKIPPED_PACKAGES = setOf("com.android.systemui")
         private val KIND_NAMES = linkedMapOf(
-            "adult" to "adult", "scam" to "scam-style", "charge" to "high-charge", "hook" to "engagement-bait",
+            "reported" to "reported by you", "adult" to "adult", "scam" to "scam-style", "charge" to "high-charge", "hook" to "engagement-bait",
         )
     }
 }

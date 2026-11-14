@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Lets the flags screen show an app's name rather than its package id. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
@@ -19,6 +26,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- What was flagged and why, with reporting. Opened from the pill. -->
+        <activity
+            android:name=".FlagsActivity"
+            android:exported="false"
+            android:label="Flags" />
 
         <!-- Reads on-screen text in other apps to score it on the device. -->
         <service

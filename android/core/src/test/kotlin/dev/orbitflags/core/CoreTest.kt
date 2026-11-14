@@ -203,3 +203,65 @@ class ScamTrackerTest {
         assertTrue(k != ScamTracker.conversationKey("org.telegram.messenger", "Alex Example"))
     }
 }
+
+class EntitiesTest {
+    private fun values(text: String) = Entities.extract(text).map { it.encode() }
+
+    @Test
+    fun findsAccountsNumbersAndSites() {
+        assertEquals(
+            listOf("DOMAIN:fast-profit.xyz", "ACCOUNT:crypto_king99", "PHONE:+447700900123"),
+            values("DM @Crypto_King99 or WhatsApp +44 7700 900123, sign up at https://www.fast-profit.xyz/join?ref=1"),
+        )
+        assertEquals(listOf("PHONE:5551234567"), values("Call (555) 123-4567 now"))
+        assertEquals(listOf("DOMAIN:bit.ly"), values("link: bit.ly/3xYz"))
+        assertEquals(listOf("DOMAIN:sub.example.co.uk"), values("see sub.example.co.uk today"))
+    }
+
+    @Test
+    fun ignoresLookalikes() {
+        assertEquals(emptyList(), values("Email me at jane@example.com"), "an email address is not an account or a site here")
+        assertEquals(emptyList(), values("Open report.pdf and node.js, e.g. the first file"))
+        assertEquals(emptyList(), values("On 2026-11-14 we sold 12,500 units for 3.99 each"))
+        assertEquals(emptyList(), values("Order 12345678 shipped"), "too short to be a full number without +")
+        assertEquals(emptyList(), values("Thanks @ everyone, see you at 10.30"))
+    }
+
+    @Test
+    fun parsesWhatAUserTypes() {
+        assertEquals("ACCOUNT:scam_account", Entities.parse(" Scam_Account ")?.encode())
+        assertEquals("ACCOUNT:scam_account", Entities.parse("@scam_account")?.encode())
+        assertEquals("DOMAIN:bad-site.com", Entities.parse("https://bad-site.com/page")?.encode())
+        assertEquals("DOMAIN:bad-site.com", Entities.parse("bad-site.com")?.encode())
+        assertEquals("PHONE:+15551234567", Entities.parse("+1 (555) 123-4567")?.encode())
+        assertNull(Entities.parse("   "))
+        assertNull(Entities.parse("just some words"))
+    }
+
+    @Test
+    fun matchesReportedEntities() {
+        val reported = listOf(
+            Entities.Entity(Entities.Type.DOMAIN, "bad-site.com"),
+            Entities.Entity(Entities.Type.ACCOUNT, "scam_account"),
+            Entities.Entity(Entities.Type.PHONE, "5551234567"),
+        )
+        assertEquals("bad-site.com", Entities.firstReported("go to pay.bad-site.com/now", reported)?.value)
+        assertEquals("scam_account", Entities.firstReported("follow @SCAM_ACCOUNT today", reported)?.value)
+        assertEquals("5551234567", Entities.firstReported("text +1 555 123 4567", reported)?.value, "country code optional")
+        assertNull(Entities.firstReported("visit notbad-site.com or @scam_account2", reported))
+        assertNull(Entities.firstReported("nothing here", reported))
+        assertNull(Entities.firstReported("go to bad-site.com", emptyList()))
+    }
+
+    @Test
+    fun encodesAndFingerprints() {
+        val e = Entities.Entity(Entities.Type.ACCOUNT, "name")
+        assertEquals(e, Entities.Entity.decode(e.encode()))
+        assertEquals("@name", e.display)
+        assertNull(Entities.Entity.decode("WHAT:x"))
+        assertNull(Entities.Entity.decode("ACCOUNT:"))
+        assertEquals(Entities.fingerprint("Claim your PRIZE now!"), Entities.fingerprint("claim your prize now"))
+        assertTrue(Entities.fingerprint("claim your prize now") != Entities.fingerprint("claim your prize today"))
+        assertEquals(20, Entities.fingerprint("x").length)
+    }
+}

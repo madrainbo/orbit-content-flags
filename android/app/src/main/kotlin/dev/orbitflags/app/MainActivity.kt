@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.orbitflags.core.Domains
+import dev.orbitflags.core.Entities
 
 class MainActivity : Activity() {
     private lateinit var flagsStatus: TextView
@@ -123,6 +124,21 @@ class MainActivity : Activity() {
         }
         // Lets automated tests reveal the sample without tapping.
         if (intent.getBooleanExtra("show_sample", false)) sampleButton.performClick()
+        // Test hooks, honoured only in debug builds: file a report, or open the flags screen.
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            intent.getStringExtra("report")?.let { text -> Entities.parse(text)?.let { ReportStore.report(this, it) } }
+            if (intent.getBooleanExtra("show_flags", false)) {
+                column.postDelayed({
+                    FlagLog.freeze()
+                    startActivity(Intent(this, FlagsActivity::class.java))
+                }, intent.getLongExtra("show_flags_after_ms", 0))
+            }
+        }
+
+        button("Recent flags and reports") {
+            FlagLog.freeze()
+            startActivity(Intent(this, FlagsActivity::class.java))
+        }
 
         heading("Long-running scams")
         body("In messaging and dating apps, the app follows the stages of investment and romance scams across a chat " +
@@ -280,6 +296,7 @@ class MainActivity : Activity() {
             "Sample chat: My uncle is a senior analyst, I can teach you to trade crypto.",
             "Sample chat: The minimum deposit is 500. Your account is frozen until you pay the tax to withdraw.",
             "Your tax rebate is ready. Enter card details so we can deposit it",
+            "Sample account: follow @orbit_sample_account for daily tips, or call +44 7700 900123.",
             "Sample: SHOCKING betrayal as corrupt officials DESTROY town in terrifying " +
                 "disaster!!! Hurry! Only 3 left in stock.",
             "Sample: Congratulations! You have been selected. Click here to claim your prize.",

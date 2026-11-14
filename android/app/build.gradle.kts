@@ -11,8 +11,8 @@ android {
         targetSdk = 35
         // Phones are arm64 (older ones armeabi-v7a); x86_64 is for emulators.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
-        versionCode = 9
-        versionName = "0.7.0"
+        versionCode = 10
+        versionName = "0.8.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

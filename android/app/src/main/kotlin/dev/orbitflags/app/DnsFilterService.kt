@@ -39,7 +39,8 @@ class DnsFilterService : VpnService() {
             stopSelf()
             return START_NOT_STICKY
         }
-        block = Prefs.list(this, "block")
+        // Sites the user reported are blocked along with the block list.
+        block = Prefs.list(this, "block") + ReportStore.reportedDomains(this)
         allow = Prefs.list(this, "allow")
         if (tun == null && !start()) {
             stopSelf()
