@@ -58,7 +58,8 @@ class TextModel(context: Context) {
     /** Scores one passage now. Safe to call from any thread. */
     @Synchronized
     fun judge(text: String): Verdict? {
-        if (text.length < MIN_CHARS || text.count { it == ' ' } < 3) return null
+        // Too little to judge: short fragments are mostly labels and names.
+        if (text.length < MIN_CHARS || text.count { it == ' ' } < MIN_WORDS - 1) return null
         val x = embedder.embed(text.take(MAX_CHARS)).embeddingResult().embeddings()[0].floatEmbedding()
         val z = FloatArray(weights.size) { k ->
             var sum = bias[k]
@@ -121,7 +122,8 @@ class TextModel(context: Context) {
         private const val TAG = "OrbitTextModel"
         private const val EMBEDDER = "text_embedder.tflite"
         private const val HEAD = "text_head.json"
-        private const val MIN_CHARS = 20
+        private const val MIN_CHARS = 30
+        private const val MIN_WORDS = 6
         private const val MAX_CHARS = 400
         private const val CACHE_SIZE = 600
         private const val MAX_PENDING = 80

@@ -18,6 +18,7 @@ import android.widget.TextView
 import dev.orbitflags.core.Entities
 import dev.orbitflags.core.ScamTracker
 import dev.orbitflags.core.Scoring
+import dev.orbitflags.core.UiChrome
 
 /**
  * Checks whichever app is in front. Text is read through the accessibility
@@ -220,8 +221,12 @@ class ContentFlagService : AccessibilityService() {
         // Never read passwords or what the user is typing.
         if (!node.isPassword && !node.isEditable && node.isVisibleToUser) {
             // Many apps (Instagram, YouTube) put post text in the description, not the text field.
-            val text = node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-                ?: node.contentDescription?.toString()?.trim()
+            val ownText = node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            var text = ownText ?: node.contentDescription?.toString()?.trim()
+            // A description on a button or picture names the control ("Send post", "Profile
+            // picture of…"); it is part of the interface, not something to judge.
+            if (ownText == null && CONTROL_TYPES.any { type.endsWith(it) }) text = null
+            if (UiChrome.isControlLabel(text)) text = null
             // The first short text near the top of a chat screen is taken as its title.
             if (chat.title == null && text != null && text.length in 2..40) {
                 val at = Rect().also { node.getBoundsInScreen(it) }
@@ -592,6 +597,8 @@ class ContentFlagService : AccessibilityService() {
         private const val MIN_PICTURE_DP = 96f
         /** Accessibility class names used for pictures and video, in apps and in browsers. */
         private val PICTURE_TYPES = listOf("ImageView", "Image", "VideoView", "TextureView", "SurfaceView")
+        /** Elements whose description is a control's name, not content. */
+        private val CONTROL_TYPES = listOf("Button", "ImageView", "Image", "CheckBox", "Switch", "SeekBar", "Spinner")
         private val SKIPPED_PACKAGES = setOf("com.android.systemui")
         private val KIND_NAMES = linkedMapOf(
             "reported" to "reported by you", "adult" to "adult", "scam" to "scam-style", "charge" to "high-charge", "hook" to "engagement-bait",

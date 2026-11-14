@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import text
-from data import TRAIN, TEST
+from data import TRAIN, TEST, REPORTED_FALSE_ALARMS
 
 CLASSES = ['benign', 'scam', 'adult', 'bait', 'charge']
 embedder = text.TextEmbedder.create_from_options(text.TextEmbedderOptions(
@@ -81,7 +81,15 @@ P = model.predict_proba(E_test)
 for i in np.argsort(-P[:, 1:].max(axis=1))[:6]:
     k = int(np.argmax(P[i, 1:])) + 1
     print(f'  {P[i, k]:.3f} [{CLASSES[k]}] {test_x[i]}')
-json.dump({'classes': CLASSES, 'hide': 0.9, 'label': 0.6, 'dim': int(E_train.shape[1]),
+print('\nlabels reported as false alarms from a real phone (top non-benign confidence after retraining):')
+for row, p in zip(REPORTED_FALSE_ALARMS, model.predict_proba(embed(REPORTED_FALSE_ALARMS))):
+    k = int(np.argmax(p[1:])) + 1
+    print(f'  {p[k]:.2f} [{CLASSES[k]}] {row}')
+for thr in [0.6, 0.7, 0.75, 0.8, 0.9]:
+    d = decide(model.predict_proba(E_test), thr); harm = test_y != 0
+    print(f'  TEST thr {thr}: harmful caught {(d[harm] != 0).mean():.2f}, ordinary wrongly flagged {int((d[~harm] != 0).sum())}/{int((~harm).sum())}')
+LABEL = float(sys.argv[4]) if len(sys.argv) > 4 else 0.7
+json.dump({'classes': CLASSES, 'hide': 0.9, 'label': LABEL, 'dim': int(E_train.shape[1]),
            'weights': [[round(float(v), 5) for v in row] for row in model.coef_],
            'bias': [round(float(v), 5) for v in model.intercept_]}, open(sys.argv[2], 'w'))
 print('\nwrote', sys.argv[2])

@@ -265,3 +265,37 @@ class EntitiesTest {
         assertEquals(20, Entities.fingerprint("x").length)
     }
 }
+
+class UiChromeTest {
+    @Test
+    fun recognisesControlLabels() {
+        // Reported from a real phone: Instagram's own labels, flagged by mistake.
+        for (label in listOf(
+            "Sponsored Photo by Structube, 22 likes",
+            "Send post. 49 shares. Button. Double tap to choose who to send this post to.",
+            "Send post. 1,244 shares. Button. Double tap to choose who to send this post to.",
+            "Profile picture of thevibefounder",
+            "More actions for this post",
+            "1,244 likes", "View all 87 comments", "Liked by someone and 40 others", "Follow", "Sponsored",
+            "Play video", "Tab 2 of 5", "Like this post", "Photo by a_user at Lisbon", "Close", "Search",
+        )) assertTrue(UiChrome.isControlLabel(label), label)
+    }
+
+    @Test
+    fun leavesContentAlone() {
+        for (content in listOf(
+            "Follow for more! Link in bio and like and share",
+            "Smash that like button if you agree",
+            "Double tap if this is you",
+            "Share this with ten friends and see what happens in an hour",
+            "Congratulations! You have been selected. Click here to claim your prize.",
+            "Like if you agree, share if you care",
+            "Send me your new number when you get the phone sorted",
+            "Save this post, you'll thank me later, and follow for part 2",
+            "The council will resurface the main road next week",
+            "Search for the truth they are hiding from you",
+        )) assertFalse(UiChrome.isControlLabel(content), content)
+        assertFalse(UiChrome.isControlLabel(""))
+        assertFalse(UiChrome.isControlLabel(null))
+    }
+}
