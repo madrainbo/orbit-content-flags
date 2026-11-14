@@ -121,6 +121,15 @@ class FlagsActivity : Activity() {
 
         val shown = FlagLog.shown
         heading("On the screen you came from")
+        val pkg = FlagLog.shownPackage
+        if (pkg.isNotEmpty() && pkg != packageName) {
+            val mode = AppModes.mode(this, pkg)
+            body("In ${FlagLog.shownName}, Orbit is set to: ${mode.label}.")
+            button("Change for ${FlagLog.shownName}") {
+                AppModes.set(this, pkg, mode.next())
+                rebuild()
+            }
+        }
         if (shown.isEmpty()) body("Nothing was flagged there.") else shown.forEach { entry(it) }
 
         val earlier = FlagLog.recent().filter { r -> shown.none { it.key == r.key } }.take(MAX_RECENT)

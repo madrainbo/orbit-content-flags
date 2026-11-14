@@ -18,6 +18,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import dev.orbitflags.core.AppPolicy
 import dev.orbitflags.core.Entities
 import dev.orbitflags.core.ScamTracker
 import dev.orbitflags.core.Scoring
@@ -55,6 +56,9 @@ class ContentFlagService : AccessibilityService() {
     private var possible: List<Finding> = emptyList()
     private var screenEntities: List<Entities.Entity> = emptyList()
     private var appInFront = ""
+    private var packageInFront = ""
+    /** False where the app in front is set to show the pill only. */
+    private var coversAllowed = true
     private val appNames = HashMap<String, String>()
     private var visionFindings: List<Finding> = emptyList()
     private var visionAiLabel = false
@@ -127,7 +131,9 @@ class ContentFlagService : AccessibilityService() {
         val root = rootInActiveWindow
         val pkg = root?.packageName?.toString()
         // System UI is skipped, and so is this app's own flags screen, which quotes flagged text.
-        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES || FlagsActivity.visible) {
+        val mode = if (pkg == null) AppPolicy.Mode.OFF else AppModes.mode(this, pkg)
+        if (pkg != null && !FlagsActivity.visible && pkg !in SKIPPED_PACKAGES) FlagLog.inFront(pkg, appName(pkg), mode)
+        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES || FlagsActivity.visible || mode == AppPolicy.Mode.OFF) {
             textFindings = emptyList()
             visionFindings = emptyList()
             textAiLabel = false
@@ -138,13 +144,9 @@ class ContentFlagService : AccessibilityService() {
             render(record = false)
             return
         }
-        appInFront = appNames.getOrPut(pkg) {
-            try {
-                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-            } catch (e: Exception) {
-                pkg
-            }
-        }
+        appInFront = appName(pkg)
+        packageInFront = pkg
+        coversAllowed = mode == AppPolicy.Mode.HIDE
         screen = Rect().also { root.getBoundsInScreen(it) }
         val passages = ArrayList<Pair<String, Rect>>()
         val images = ArrayList<Rect>()
@@ -247,6 +249,8 @@ class ContentFlagService : AccessibilityService() {
             collect(child, out, images, depth + 1, visited, aiLabel, chat)
         }
     }
+
+    private fun appName(pkg: String): String = appNames.getOrPut(pkg) { AppModes.appName(this, pkg) }
 
     private class ChatScreen {
         var hasMessageBox = false
@@ -405,7 +409,7 @@ class ContentFlagService : AccessibilityService() {
         val all = dropNested(textFindings + fromImages)
         if (record) FlagLog.record(appInFront, all + possible, screenEntities, System.currentTimeMillis())
         val screenArea = screen.width().toLong() * screen.height()
-        val hide = Prefs.hideFlagged(this)
+        val hide = Prefs.hideFlagged(this) && coversAllowed
         // Less certain "possible" flags are covered as well, unless the user turned that off.
         val candidates = if (Prefs.hidePossible(this)) dropNested(all + possible) else all
         val toCover = if (!hide) emptyList() else candidates.filter { f ->

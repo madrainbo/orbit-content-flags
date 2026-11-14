@@ -299,3 +299,24 @@ class UiChromeTest {
         assertFalse(UiChrome.isControlLabel(null))
     }
 }
+
+class AppPolicyTest {
+    @Test
+    fun assistantsDefaultToPillOnly() {
+        assertEquals(AppPolicy.Mode.PILL, AppPolicy.defaultMode("com.anthropic.claude"))
+        assertEquals(AppPolicy.Mode.PILL, AppPolicy.defaultMode("ai.perplexity.app.android"))
+        assertEquals(AppPolicy.Mode.PILL, AppPolicy.defaultMode("com.google.android.apps.bard"))
+        assertEquals(AppPolicy.Mode.HIDE, AppPolicy.defaultMode("com.instagram.android"))
+        assertEquals(AppPolicy.Mode.HIDE, AppPolicy.defaultMode("com.android.chrome"))
+    }
+
+    @Test
+    fun aChoiceOverridesTheDefault() {
+        assertEquals(AppPolicy.Mode.OFF, AppPolicy.mode("com.instagram.android", "OFF"))
+        assertEquals(AppPolicy.Mode.HIDE, AppPolicy.mode("com.anthropic.claude", "HIDE"))
+        assertEquals(AppPolicy.Mode.PILL, AppPolicy.mode("com.anthropic.claude", null))
+        assertEquals(AppPolicy.Mode.HIDE, AppPolicy.mode("com.instagram.android", "nonsense"))
+        assertEquals(AppPolicy.Mode.PILL, AppPolicy.Mode.HIDE.next())
+        assertEquals(AppPolicy.Mode.HIDE, AppPolicy.Mode.OFF.next())
+    }
+}

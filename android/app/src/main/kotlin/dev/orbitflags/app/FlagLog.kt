@@ -23,6 +23,25 @@ object FlagLog {
     private val history = ArrayDeque<Entry>()
     private var current: List<Entry> = emptyList()
     private var currentEntities: List<Entities.Entity> = emptyList()
+    private var frontPackage = ""
+    private var frontName = ""
+
+    /** The app the user was in when they opened the flags screen. */
+    var shownPackage = ""
+        private set
+    var shownName = ""
+        private set
+
+    /** Notes which app is in front, flagged or not, so its mode can be changed from the flags screen. */
+    @Synchronized
+    fun inFront(appPackage: String, name: String, mode: dev.orbitflags.core.AppPolicy.Mode) {
+        if (appPackage != frontPackage) {
+            current = emptyList()
+            currentEntities = emptyList()
+        }
+        frontPackage = appPackage
+        frontName = name
+    }
 
     /** What was on screen when the user last opened the flags screen. */
     var shown: List<Entry> = emptyList()
@@ -46,6 +65,8 @@ object FlagLog {
     fun freeze() {
         shown = current
         shownEntities = currentEntities
+        shownPackage = frontPackage
+        shownName = frontName
     }
 
     @Synchronized

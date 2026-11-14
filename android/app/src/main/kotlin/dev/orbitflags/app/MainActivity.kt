@@ -16,6 +16,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.orbitflags.core.AppPolicy
 import dev.orbitflags.core.Domains
 import dev.orbitflags.core.Entities
 
@@ -24,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var visionStatus: TextView
     private lateinit var chatStatus: TextView
     private lateinit var modelStatus: TextView
+    private lateinit var appList: LinearLayout
     private lateinit var flagsButton: Button
     private lateinit var dnsButton: Button
     private lateinit var blockInput: EditText
@@ -132,6 +134,7 @@ class MainActivity : Activity() {
         // Test hooks, honoured only in debug builds: file a report, or open the flags screen.
         if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             intent.getStringExtra("report")?.let { text -> Entities.parse(text)?.let { ReportStore.report(this, it) } }
+            applyTestMode(intent)
             if (intent.getBooleanExtra("show_flags", false)) {
                 column.postDelayed({
                     FlagLog.freeze()
@@ -144,6 +147,13 @@ class MainActivity : Activity() {
             FlagLog.freeze()
             startActivity(Intent(this, FlagsActivity::class.java))
         }
+
+        heading("Apps")
+        body("In feeds and messages, flagged content is hidden. In assistant apps such as Claude, Gemini, ChatGPT " +
+            "and Perplexity you asked for the content, so by default only the pill is shown and nothing is hidden. " +
+            "Tap an app below to change it; any other app can be changed from the flags screen while you are in it.")
+        appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column.addView(appList)
 
         heading("Long-running scams")
         body("In messaging and dating apps, the app follows the stages of investment and romance scams across a chat " +
@@ -185,6 +195,18 @@ class MainActivity : Activity() {
         refresh()
     }
 
+    /** Test hook, debug builds only: "--es app_mode package=MODE" sets an app's mode. */
+    private fun applyTestMode(intent: Intent) {
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE == 0) return
+        val kv = intent.getStringExtra("app_mode")?.split('=') ?: return
+        AppPolicy.Mode.entries.firstOrNull { it.name == kv.getOrNull(1) }?.let { AppModes.set(this, kv[0], it) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        applyTestMode(intent)
+    }
+
     private fun textAsPicture(vararg lines: String): android.graphics.Bitmap {
         val bitmap = android.graphics.Bitmap.createBitmap(dp(320), dp(36) * lines.size + dp(16),
             android.graphics.Bitmap.Config.ARGB_8888)
@@ -220,6 +242,20 @@ class MainActivity : Activity() {
             ContentFlagService.textModelRunning -> "Text model: running."
             else -> "Text model: not available on this device; the phrase rules still apply."
         }
+        appList.removeAllViews()
+        val apps = (AppPolicy.ASSISTANTS.filter { AppModes.installed(this, it) } + AppModes.chosen(this)).distinct()
+        for (pkg in apps) {
+            val mode = AppModes.mode(this, pkg)
+            appList.addView(Button(this).apply {
+                text = "${AppModes.appName(this@MainActivity, pkg)}: ${mode.label}"
+                isAllCaps = false
+                setOnClickListener {
+                    AppModes.set(this@MainActivity, pkg, mode.next())
+                    refresh()
+                }
+            })
+        }
+        if (apps.isEmpty()) appList.addView(TextView(this).apply { text = "No assistant apps found on this phone." })
         val chats = ChatWatch(this).count()
         chatStatus.text = if (chats == 1) "Markers stored for 1 chat." else "Markers stored for $chats chats."
         val summary = ScreenVision.lastSummary
