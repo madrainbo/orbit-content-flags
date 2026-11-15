@@ -8,7 +8,7 @@
 |---|---|---|
 | news | news media, news agency, newspaper, daily newspaper | 8 |
 | broadcaster | broadcaster, TV channel, public broadcaster | 8 |
-| government | government agency, government organisation; places and territories removed | 20 |
+| government | government agency, government organisation; places and territories removed (26,368 town and council entries) | 20 |
 | international | intergovernmental organisation | 10 |
 | university | university (direct instances only) | 25 |
 | tv series | television series (direct instances only); accounts, sites and English titles | 12 |
@@ -34,6 +34,7 @@ python3 build.py ../../shared/trusted/trusted.tsv   # about 60 queries; results 
 ## Limits
 
 - **Wikidata rate-limits shared addresses.** The build needed retries, and the live API refused requests from this build machine for a while. Lookups from users' phones each come from their own address, but at scale this should move to a server the project runs, holding a copy of the data. Wikimedia's policy also asks automated clients to give contact details in their user agent, which the app does not yet do.
+- **One query was lost to rate limiting:** websites of items classed only as "government organisation" (their accounts are included). Rerunning the build fills it in from the cache.
 - **Coverage is notable sources only.** Smaller outlets, local news and most creators are not in it.
 - **Websites lapse.** An organisation's old domain can be bought by someone else; the list does not check that a site still belongs to the item.
 - **Accounts get hacked.** A known account posting a scam will not be hidden.

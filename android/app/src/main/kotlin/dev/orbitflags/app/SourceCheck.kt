@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
  * username alone is looked up on Wikidata: nothing else from the screen is
  * sent. Results are cached for 30 days and lookups are rate-limited.
  */
-class SourceCheck(private val context: Context) {
+class SourceCheck(private val context: Context, onLoaded: () -> Unit) {
     @Volatile var trusted: TrustedSources? = null
         private set
 
@@ -25,6 +25,8 @@ class SourceCheck(private val context: Context) {
     private val prefs get() = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
     private val pending = HashSet<String>()
     private val recentLookups = ArrayDeque<Long>()
+    /** Usernames whose lookup failed (no network, refused): not retried until this time. */
+    private val failedUntil = HashMap<String, Long>()
 
     init {
         worker.execute {
@@ -35,6 +37,8 @@ class SourceCheck(private val context: Context) {
                 null
             }
             Log.d(TAG, "trusted list loaded: ${trusted?.size ?: 0} entries")
+            // Anything checked before the list was ready is checked again.
+            onLoaded()
         }
     }
 
@@ -55,6 +59,7 @@ class SourceCheck(private val context: Context) {
         }
         if (!Prefs.liveLookup(context)) return null
         synchronized(pending) {
+            if ((failedUntil[key] ?: 0) > System.currentTimeMillis()) return null
             if (!pending.add(key)) return null
         }
         if (worker.isShutdown) return null
@@ -69,6 +74,7 @@ class SourceCheck(private val context: Context) {
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "lookup failed: " + e.javaClass.simpleName)
+                synchronized(pending) { failedUntil[key] = System.currentTimeMillis() + RETRY_AFTER_MS }
             } finally {
                 synchronized(pending) { pending.remove(key) }
             }
@@ -152,6 +158,7 @@ class SourceCheck(private val context: Context) {
         private const val CACHE_MS = 30L * 24 * 60 * 60 * 1000
         private const val MAX_LOOKUPS_PER_HOUR = 20
         private const val MIN_SITELINKS = 10
+        private const val RETRY_AFTER_MS = 15L * 60 * 1000
 
         /** The Wikidata property holding a username on each platform. */
         private val PROPERTY_BY_APP = mapOf(

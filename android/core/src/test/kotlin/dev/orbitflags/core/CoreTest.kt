@@ -383,3 +383,18 @@ class TrustedSourcesTest {
         assertEquals(listOf<String?>(null), TrustedSources.authors(listOf(500), emptyList()))
     }
 }
+
+class BundledTrustedListTest {
+    private val list = TrustedSources(java.io.File("../../shared/trusted/trusted.tsv").readText())
+
+    @Test
+    fun containsWellKnownSources() {
+        assertTrue(list.size > 10_000, "the generated list, not the placeholder")
+        for (h in listOf("bbcnews", "nytimes", "reuters", "nasa", "cdcgov")) {
+            assertNotNull(list.account(TrustedSources.posterKey("@$h")), h)
+        }
+        assertNotNull(list.account(TrustedSources.posterKey("bbcnews")), "lower case, no @, seven letters")
+        assertNotNull(list.domain("www.bbc.co.uk"))
+        assertNull(list.account("stranger_99"))
+    }
+}

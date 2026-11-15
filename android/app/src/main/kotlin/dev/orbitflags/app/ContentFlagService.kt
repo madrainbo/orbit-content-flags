@@ -79,7 +79,7 @@ class ContentFlagService : AccessibilityService() {
         chats = ChatWatch(this)
         vision = ScreenVision(this)
         // A missing native library (for example on x86 devices) must not stop the service.
-        sources = SourceCheck(this)
+        sources = SourceCheck(this) { handler.post { requestScan() } }
         textModel = try {
             TextModel(this)
         } catch (e: Throwable) {
@@ -125,6 +125,7 @@ class ContentFlagService : AccessibilityService() {
         hidePill()
         hideBanner()
         setCovers(emptyList())
+        scanWorker.shutdown()
         vision?.close()
         vision = null
         textModel?.close()
@@ -134,35 +135,92 @@ class ContentFlagService : AccessibilityService() {
         super.onDestroy()
     }
 
+    private val scanWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var scanRunning = false
+    private var scanAgain = false
+
+    /** Screen bounds and app of the scan in progress; used only on the scan thread. */
+    private var workScreen = Rect()
+    private var workPackage = ""
+
+    private class ScanResult(
+        val pkg: String?,
+        val name: String,
+        val mode: AppPolicy.Mode,
+        val skip: Boolean,
+        val windowId: Int = -1,
+        val screen: Rect = Rect(),
+        val found: List<Finding> = emptyList(),
+        val maybe: List<Finding> = emptyList(),
+        val trusted: List<Finding> = emptyList(),
+        val entities: List<Entities.Entity> = emptyList(),
+        val aiLabel: Boolean = false,
+        val pressure: Boolean = false,
+        val pictures: List<Rect> = emptyList(),
+        val notes: ScreenNotes? = null,
+        val texts: List<String> = emptyList(),
+    )
+
+    /** Asks for a scan shortly, unless one is already queued. */
+    private fun requestScan() {
+        if (!connected || scanPending) return
+        scanPending = true
+        handler.postDelayed({
+            scanPending = false
+            scan()
+        }, SCAN_DELAY_MS)
+    }
+
+    /**
+     * Reads and checks the screen on a background thread, then shows the
+     * result on the main thread. Checking hundreds of passages against the
+     * rules takes long enough to freeze an app if done on the main thread.
+     */
     private fun scan() {
-        val root = rootInActiveWindow
-        val pkg = root?.packageName?.toString()
-        // System UI is skipped, and so is this app's own flags screen, which quotes flagged text.
-        val mode = if (pkg == null) AppPolicy.Mode.OFF else AppModes.mode(this, pkg)
-        if (pkg != null && !FlagsActivity.visible && pkg !in SKIPPED_PACKAGES) FlagLog.inFront(pkg, appName(pkg), mode)
-        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES || FlagsActivity.visible || mode == AppPolicy.Mode.OFF) {
-            textFindings = emptyList()
-            visionFindings = emptyList()
-            textAiLabel = false
-            visionAiLabel = false
-            pressure = false
-            possible = emptyList()
-            notHidden = emptyList()
-            hideBanner()
-            render(record = false)
+        if (scanRunning) {
+            scanAgain = true
             return
         }
-        appInFront = appName(pkg)
-        packageInFront = pkg
-        coversAllowed = mode == AppPolicy.Mode.HIDE
-        screen = Rect().also { root.getBoundsInScreen(it) }
+        val root = rootInActiveWindow
+        scanRunning = true
+        try {
+            scanWorker.execute {
+                val result = try {
+                    analyse(root)
+                } catch (e: Exception) {
+                    android.util.Log.d("OrbitScan", "scan failed: " + e.javaClass.simpleName)
+                    null
+                }
+                handler.post {
+                    scanRunning = false
+                    if (connected && result != null) show(result)
+                    if (scanAgain) {
+                        scanAgain = false
+                        requestScan()
+                    }
+                }
+            }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            scanRunning = false
+        }
+    }
+
+    /** Runs on the scan thread: everything except touching the screen. */
+    private fun analyse(root: AccessibilityNodeInfo?): ScanResult {
+        val pkg = root?.packageName?.toString()
+        val name = if (pkg == null) "" else appName(pkg)
+        // System UI is skipped, and so is this app's own flags screen, which quotes flagged text.
+        val mode = if (pkg == null) AppPolicy.Mode.OFF else AppModes.mode(this, pkg)
+        if (root == null || pkg == null || pkg in SKIPPED_PACKAGES || FlagsActivity.visible || mode == AppPolicy.Mode.OFF) {
+            return ScanResult(pkg, name, mode, skip = true)
+        }
+        workPackage = pkg
+        workScreen = Rect().also { root.getBoundsInScreen(it) }
         val passages = ArrayList<Pair<String, Rect>>()
         val images = ArrayList<Rect>()
         val aiLabel = booleanArrayOf(false)
         val chat = ScreenNotes()
         collect(root, passages, images, 0, intArrayOf(0), aiLabel, chat)
-        watchChat(pkg, chat, passages.map { it.first })
-        pictures = images.sortedByDescending { it.width().toLong() * it.height() }.take(MAX_PICTURES)
 
         val found = ArrayList<Finding>()
         val seen = HashSet<String>()
@@ -184,22 +242,11 @@ class ContentFlagService : AccessibilityService() {
             val kind = c.kind
             if (kind != null) found.add(Finding("t:$text", bounds, kind, c.reason)) else unflagged.add(text to bounds)
         }
-        screenEntities = entities.take(MAX_ENTITIES)
         // Passages the rules let through are judged as a whole by the text model.
         val maybe = ArrayList<Finding>()
         val model = textModel
         if (model != null && Prefs.useTextModel(this)) {
-            val verdicts = model.lookup(unflagged.map { it.first }) {
-                handler.post {
-                    if (connected && !scanPending) {
-                        scanPending = true
-                        handler.postDelayed({
-                            scanPending = false
-                            scan()
-                        }, SCAN_DELAY_MS)
-                    }
-                }
-            }
+            val verdicts = model.lookup(unflagged.map { it.first }) { handler.post { requestScan() } }
             for ((text, bounds) in unflagged) {
                 val v = verdicts[text] ?: continue
                 val reason = (TextModel.REASONS[v.kind] ?: "flagged") + " (text model, ${(v.confidence * 100).toInt()}% sure)"
@@ -209,13 +256,51 @@ class ContentFlagService : AccessibilityService() {
         }
         // Content posted by, or hosted on, a known source is listed but not hidden.
         val trustedHere = applyTrust(pkg, chat, found, maybe)
-        possible = maybe.filter { it.trustedBy == null }
-        textFindings = found.filter { it.trustedBy == null }
-        notHidden = trustedHere
-        textAiLabel = aiLabel[0]
-        pressure = Scoring.urgencySignals(passages.joinToString("\n") { it.first }).isNotEmpty()
+        return ScanResult(
+            pkg, name, mode, skip = false,
+            windowId = root.windowId,
+            screen = Rect(workScreen),
+            found = found.filter { it.trustedBy == null },
+            maybe = maybe.filter { it.trustedBy == null },
+            trusted = trustedHere,
+            entities = entities.take(MAX_ENTITIES),
+            aiLabel = aiLabel[0],
+            pressure = Scoring.urgencySignals(passages.joinToString("\n") { it.first }).isNotEmpty(),
+            pictures = images.sortedByDescending { it.width().toLong() * it.height() }.take(MAX_PICTURES),
+            notes = chat,
+            texts = passages.map { it.first },
+        )
+    }
+
+    /** Runs on the main thread: applies a scan result to the covers, pill and warning. */
+    private fun show(r: ScanResult) {
+        if (r.pkg != null && !FlagsActivity.visible && r.pkg !in SKIPPED_PACKAGES) FlagLog.inFront(r.pkg, r.name, r.mode)
+        if (r.skip || r.pkg == null) {
+            textFindings = emptyList()
+            visionFindings = emptyList()
+            textAiLabel = false
+            visionAiLabel = false
+            pressure = false
+            possible = emptyList()
+            notHidden = emptyList()
+            hideBanner()
+            render(record = false)
+            return
+        }
+        appInFront = r.name
+        packageInFront = r.pkg
+        coversAllowed = r.mode == AppPolicy.Mode.HIDE
+        screen = r.screen
+        pictures = r.pictures
+        screenEntities = r.entities
+        r.notes?.let { watchChat(r.pkg, it, r.texts) }
+        possible = r.maybe
+        textFindings = r.found
+        notHidden = r.trusted
+        textAiLabel = r.aiLabel
+        pressure = r.pressure
         render()
-        maybeCapture(root.windowId)
+        maybeCapture(r.windowId)
     }
 
     private fun collect(
@@ -228,7 +313,7 @@ class ContentFlagService : AccessibilityService() {
         val type = node.className?.toString() ?: ""
         if (node.isVisibleToUser && PICTURE_TYPES.any { type.endsWith(it) }) {
             val bounds = Rect().also { node.getBoundsInScreen(it) }
-            if (bounds.intersect(screen) && bounds.width() >= dp(MIN_PICTURE_DP) && bounds.height() >= dp(MIN_PICTURE_DP)) {
+            if (bounds.intersect(workScreen) && bounds.width() >= dp(MIN_PICTURE_DP) && bounds.height() >= dp(MIN_PICTURE_DP)) {
                 images.add(bounds)
             }
         }
@@ -252,7 +337,7 @@ class ContentFlagService : AccessibilityService() {
             // The first short text near the top of a chat screen is taken as its title.
             if (chat.title == null && text != null && text.length in 2..40) {
                 val at = Rect().also { node.getBoundsInScreen(it) }
-                if (at.top < screen.top + screen.height() * TITLE_BAND) chat.title = text
+                if (at.top < workScreen.top + workScreen.height() * TITLE_BAND) chat.title = text
             }
             // Usernames and TV titles shown on their own say who posted or what is being shown.
             if (text != null && text.length <= 40) {
@@ -260,14 +345,14 @@ class ContentFlagService : AccessibilityService() {
                     chat.handles.add(h to Rect().also { node.getBoundsInScreen(it) }.top)
                 }
                 if (chat.show == null) {
-                    chat.show = sources?.trusted?.title(text, packageInFront in SourceCheck.VIDEO_APPS)
+                    chat.show = sources?.trusted?.title(text, workPackage in SourceCheck.VIDEO_APPS)
                 }
             }
             // Short badges such as "AI info" are labels the app itself displays.
             if (!aiLabel[0] && Scoring.isAiLabel(text)) aiLabel[0] = true
             if (text != null && text.length >= Finding.MIN_CHARS) {
                 val bounds = Rect().also { node.getBoundsInScreen(it) }
-                if (bounds.intersect(screen)) out.add(text.take(MAX_CHARS) to bounds)
+                if (bounds.intersect(workScreen)) out.add(text.take(MAX_CHARS) to bounds)
             }
         }
         for (i in 0 until node.childCount) {
@@ -290,18 +375,7 @@ class ContentFlagService : AccessibilityService() {
         val all = found + maybe
         val tops = all.map { it.bounds.top }
         val authors = TrustedSources.authors(tops, notes.handles)
-        val rescan = {
-            handler.post {
-                if (connected && !scanPending) {
-                    scanPending = true
-                    handler.postDelayed({
-                        scanPending = false
-                        scan()
-                    }, SCAN_DELAY_MS)
-                }
-            }
-            Unit
-        }
+        val rescan = { handler.post { requestScan() }; Unit }
         val trusted = ArrayList<Finding>()
         for ((i, f) in all.withIndex()) {
             if (f.kind == "reported" || !f.key.startsWith("t:")) continue
