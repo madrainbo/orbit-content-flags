@@ -12,6 +12,7 @@ object FlagLog {
         val kind: String,
         val reason: String,
         val possible: Boolean,
+        val trustedBy: String?,
         val app: String,
         val time: Long,
     ) {
@@ -51,7 +52,7 @@ object FlagLog {
 
     @Synchronized
     fun record(app: String, findings: List<Finding>, entities: List<Entities.Entity>, now: Long) {
-        current = findings.map { Entry(it.key, it.kind, it.reason, it.possible, app, now) }
+        current = findings.map { Entry(it.key, it.kind, it.reason, it.possible, it.trustedBy, app, now) }
         currentEntities = entities
         for (e in current) {
             if (history.any { it.key == e.key }) continue

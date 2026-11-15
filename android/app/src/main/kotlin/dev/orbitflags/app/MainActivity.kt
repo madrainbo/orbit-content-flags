@@ -155,6 +155,17 @@ class MainActivity : Activity() {
         appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         column.addView(appList)
 
+        heading("Known sources")
+        body("Flagged content posted by, or shown on the site of, a notable news organisation, broadcaster, public " +
+            "body or university is listed but not hidden, and charged wording that describes a known TV series is " +
+            "not hidden either. Being mentioned in a post does not count. The list comes from Wikidata and is on " +
+            "this phone.")
+        column.addView(android.widget.CheckBox(this).apply {
+            text = "Look up unknown posters on Wikidata (sends only the username, at most 20 times an hour)"
+            isChecked = Prefs.liveLookup(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> Prefs.setLiveLookup(this@MainActivity, checked) }
+        })
+
         heading("Long-running scams")
         body("In messaging and dating apps, the app follows the stages of investment and romance scams across a chat " +
             "over days or weeks, and warns when several have appeared. It stores only which stages were seen and " +
@@ -184,10 +195,20 @@ class MainActivity : Activity() {
             "Your traffic is not sent through any server. Android shows a key icon while it is on.")
         dnsButton = button("") { toggleDns() }
 
-        setContentView(ScrollView(this).apply {
+        val scroller = ScrollView(this).apply {
             fitsSystemWindows = true
             addView(column)
-        })
+        }
+        setContentView(scroller)
+        // Test hook, debug builds only: scroll so the sample whose text starts with this is at the top.
+        val scrollTo = intent.getStringExtra("scroll_to_sample")
+        if (scrollTo != null && applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            column.postDelayed({
+                (0 until column.childCount).map { column.getChildAt(it) }
+                    .firstOrNull { (it as? TextView)?.text?.startsWith(scrollTo) == true }
+                    ?.let { scroller.scrollTo(0, it.top - dp(24)) }
+            }, 1500)
+        }
     }
 
     override fun onResume() {
@@ -343,6 +364,10 @@ class MainActivity : Activity() {
             "Sample: Congratulations! You have been selected. Click here to claim your prize.",
             "Sample: Hot singles in your area want to chat. 18+ only, uncensored live cams.",
             "AI info",
+            "@bbcnews",
+            "Sample from a known source: Terrifying storm DESTROYS coastal town in a deadly disaster!!!",
+            "@stranger_99",
+            "Sample from a stranger: Terrifying storm DESTROYS our town and corrupt officials betrayed us!!!",
         )
     }
 }

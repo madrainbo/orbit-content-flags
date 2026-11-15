@@ -68,6 +68,14 @@ object Prefs {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putInt(key, value).apply()
     }
 
+    /** Whether unknown posters of flagged content are looked up on Wikidata (default on). */
+    fun liveLookup(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("live_lookup", true)
+
+    fun setLiveLookup(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("live_lookup", value).apply()
+    }
+
     fun save(context: Context, block: List<String>, allow: List<String>) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
             .putString("block", block.joinToString("\n"))

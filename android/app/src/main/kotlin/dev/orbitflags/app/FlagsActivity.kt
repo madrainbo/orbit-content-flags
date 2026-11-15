@@ -90,12 +90,17 @@ class FlagsActivity : Activity() {
     }
 
     private fun entry(e: FlagLog.Entry) {
-        val label = (Finding.LABELS[e.kind] ?: "Flagged") + if (e.possible) " (possible)" else ""
+        val label = (Finding.LABELS[e.kind] ?: "Flagged") + when {
+            e.trustedBy != null -> " (not hidden: known source)"
+            e.possible -> " (possible)"
+            else -> ""
+        }
         body(label, 15f).apply {
             setPadding(0, dp(12), 0, 0)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         body(e.reason.replaceFirstChar { it.uppercase() } + ".")
+        e.trustedBy?.let { body("Not hidden because it is $it.") }
         body("In ${e.app} · ${ago(e.time)}", 12f)
         val text = e.text
         body(if (text == null) "A picture." else "“" + text.take(EXCERPT) + (if (text.length > EXCERPT) "…" else "") + "”")

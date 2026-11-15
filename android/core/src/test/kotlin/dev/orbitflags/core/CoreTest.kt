@@ -320,3 +320,66 @@ class AppPolicyTest {
         assertEquals(AppPolicy.Mode.HIDE, AppPolicy.Mode.OFF.next())
     }
 }
+
+class TrustedSourcesTest {
+    private val list = TrustedSources(
+        """
+        # type	value	label	category	wikidata
+        ACCOUNT	bbcnews	BBC News	broadcaster	Q1160945
+        ACCOUNT	who	World Health Organization	international	Q7817
+        DOMAIN	bbc.co.uk	BBC	broadcaster	Q9531
+        DOMAIN	who.int	World Health Organization	international	Q7817
+        TITLE	breaking bad	Breaking Bad	tv series	Q1079
+        TITLE	dark	Dark	tv series	Q30122289
+        """.trimIndent(),
+    )
+
+    @Test
+    fun looksUpAccountsSitesAndTitles() {
+        assertEquals(6, list.size)
+        assertEquals("BBC News", list.account("@BBCNews")?.label)
+        assertNull(list.account("bbcnews_official"), "a lookalike is not trusted")
+        assertEquals("BBC", list.domain("https://www.news.bbc.co.uk/path")?.label)
+        assertNull(list.domain("bbc.co.uk.evil.com"))
+        assertNull(list.domain("notbbc.co.uk"))
+        assertNull(list.domain("co.uk"))
+        assertEquals("Breaking Bad", list.title(" Breaking Bad ", inVideoApp = false)?.label)
+        assertNull(list.title("Dark", inVideoApp = false), "one-word titles only in video apps")
+        assertEquals("Dark", list.title("Dark", inVideoApp = true)?.label)
+        assertNull(list.title("Breaking Bad is great", inVideoApp = true))
+        assertEquals("BBC News (broadcaster, per Wikidata)", list.account("bbcnews")?.description)
+    }
+
+    @Test
+    fun recognisesUsernameElements() {
+        assertEquals("bbcnews", TrustedSources.handleIn("bbcnews"))
+        assertEquals("the.daily_baker", TrustedSources.handleIn("@The.Daily_Baker"))
+        assertNull(TrustedSources.handleIn("Follow"), "a control label")
+        assertNull(TrustedSources.handleIn("People"), "a capitalised word is interface text, not People magazine")
+        assertNull(TrustedSources.handleIn("BBCNews"), "capitals without @ are not a username")
+        assertEquals("bbcnews", TrustedSources.handleIn("@BBCNews"), "with @ the case does not matter")
+        assertNull(TrustedSources.handleIn("BBC News reports"), "spaces")
+        assertNull(TrustedSources.handleIn("12345"), "digits only")
+        assertNull(TrustedSources.handleIn("a"))
+    }
+
+    @Test
+    fun shortPlainWordsNeedAnAtSign() {
+        val withEvil = TrustedSources(list.let { "ACCOUNT\tevil\tEvil\ttv series\tQ1\nACCOUNT\tnytimes\tThe New York Times\tnews\tQ2\n" })
+        assertEquals("?evil", TrustedSources.posterKey("evil"), "a one-word comment could look like this")
+        assertNull(withEvil.account(TrustedSources.posterKey("evil")))
+        assertEquals("Evil", withEvil.account(TrustedSources.posterKey("@evil"))?.label)
+        assertEquals("nytimes", TrustedSources.posterKey("nytimes"), "seven letters or more is not a one-word comment")
+        assertEquals("The New York Times", withEvil.account(TrustedSources.posterKey("nytimes"))?.label)
+        assertEquals("bbc_news", TrustedSources.posterKey("bbc_news"))
+        assertNull(TrustedSources.posterKey("Evil"), "capitalised text is not a username")
+    }
+
+    @Test
+    fun attributesPassagesToTheNearestUsernameAbove() {
+        val handles = listOf("bbcnews" to 100, "stranger_99" to 900)
+        assertEquals(listOf(null, "bbcnews", "bbcnews", "stranger_99"),
+            TrustedSources.authors(listOf(50, 100, 600, 1200), handles))
+        assertEquals(listOf<String?>(null), TrustedSources.authors(listOf(500), emptyList()))
+    }
+}

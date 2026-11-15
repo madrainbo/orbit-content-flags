@@ -11,8 +11,8 @@ android {
         targetSdk = 35
         // Phones are arm64 (older ones armeabi-v7a); x86_64 is for emulators.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
-        versionCode = 13
-        versionName = "0.10.0"
+        versionCode = 14
+        versionName = "0.11.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,6 +21,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
     // The model file is memory-mapped, so it must be stored uncompressed.
     androidResources { noCompress += "tflite" }
+    // The trusted-source list is generated into shared/trusted and bundled as an asset.
+    sourceSets["main"].assets.srcDir("../../shared/trusted")
 }
 dependencies {
     implementation(project(":core"))

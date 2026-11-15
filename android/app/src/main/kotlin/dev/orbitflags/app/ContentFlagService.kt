@@ -22,6 +22,7 @@ import dev.orbitflags.core.AppPolicy
 import dev.orbitflags.core.Entities
 import dev.orbitflags.core.ScamTracker
 import dev.orbitflags.core.Scoring
+import dev.orbitflags.core.TrustedSources
 import dev.orbitflags.core.UiChrome
 
 /**
@@ -52,9 +53,12 @@ class ContentFlagService : AccessibilityService() {
 
     private var vision: ScreenVision? = null
     private var textModel: TextModel? = null
+    private var sources: SourceCheck? = null
     /** Passages the text model is fairly, but not very, sure about: listed, not hidden. */
     private var possible: List<Finding> = emptyList()
     private var screenEntities: List<Entities.Entity> = emptyList()
+    /** Findings from known sources: listed on the flags screen, never covered. */
+    private var notHidden: List<Finding> = emptyList()
     private var appInFront = ""
     private var packageInFront = ""
     /** False where the app in front is set to show the pill only. */
@@ -75,6 +79,7 @@ class ContentFlagService : AccessibilityService() {
         chats = ChatWatch(this)
         vision = ScreenVision(this)
         // A missing native library (for example on x86 devices) must not stop the service.
+        sources = SourceCheck(this)
         textModel = try {
             TextModel(this)
         } catch (e: Throwable) {
@@ -124,6 +129,8 @@ class ContentFlagService : AccessibilityService() {
         vision = null
         textModel?.close()
         textModel = null
+        sources?.close()
+        sources = null
         super.onDestroy()
     }
 
@@ -140,6 +147,7 @@ class ContentFlagService : AccessibilityService() {
             visionAiLabel = false
             pressure = false
             possible = emptyList()
+            notHidden = emptyList()
             hideBanner()
             render(record = false)
             return
@@ -151,7 +159,7 @@ class ContentFlagService : AccessibilityService() {
         val passages = ArrayList<Pair<String, Rect>>()
         val images = ArrayList<Rect>()
         val aiLabel = booleanArrayOf(false)
-        val chat = ChatScreen()
+        val chat = ScreenNotes()
         collect(root, passages, images, 0, intArrayOf(0), aiLabel, chat)
         watchChat(pkg, chat, passages.map { it.first })
         pictures = images.sortedByDescending { it.width().toLong() * it.height() }.take(MAX_PICTURES)
@@ -199,8 +207,11 @@ class ContentFlagService : AccessibilityService() {
                 else maybe.add(Finding("t:$text", bounds, v.kind, reason, possible = true))
             }
         }
-        possible = maybe
-        textFindings = found
+        // Content posted by, or hosted on, a known source is listed but not hidden.
+        val trustedHere = applyTrust(pkg, chat, found, maybe)
+        possible = maybe.filter { it.trustedBy == null }
+        textFindings = found.filter { it.trustedBy == null }
+        notHidden = trustedHere
         textAiLabel = aiLabel[0]
         pressure = Scoring.urgencySignals(passages.joinToString("\n") { it.first }).isNotEmpty()
         render()
@@ -209,7 +220,7 @@ class ContentFlagService : AccessibilityService() {
 
     private fun collect(
         node: AccessibilityNodeInfo, out: MutableList<Pair<String, Rect>>, images: MutableList<Rect>,
-        depth: Int, visited: IntArray, aiLabel: BooleanArray, chat: ChatScreen,
+        depth: Int, visited: IntArray, aiLabel: BooleanArray, chat: ScreenNotes,
     ) {
         if (depth > MAX_DEPTH || visited[0] >= MAX_NODES) return
         visited[0] += 1
@@ -221,8 +232,14 @@ class ContentFlagService : AccessibilityService() {
                 images.add(bounds)
             }
         }
-        // A message box marks a chat screen; its contents are never read.
-        if (node.isEditable) chat.hasMessageBox = true
+        // A browser's address bar says which site the page is on.
+        val viewId = node.viewIdResourceName
+        if (viewId != null && viewId in SourceCheck.URL_BAR_IDS) {
+            chat.pageHost = node.text?.toString()?.trim()?.substringBefore(' ')
+        } else if (node.isEditable) {
+            // A message box marks a chat screen; its contents are never read.
+            chat.hasMessageBox = true
+        }
         // Never read passwords or what the user is typing.
         if (!node.isPassword && !node.isEditable && node.isVisibleToUser) {
             // Many apps (Instagram, YouTube) put post text in the description, not the text field.
@@ -237,6 +254,15 @@ class ContentFlagService : AccessibilityService() {
                 val at = Rect().also { node.getBoundsInScreen(it) }
                 if (at.top < screen.top + screen.height() * TITLE_BAND) chat.title = text
             }
+            // Usernames and TV titles shown on their own say who posted or what is being shown.
+            if (text != null && text.length <= 40) {
+                TrustedSources.posterKey(text)?.let { h ->
+                    chat.handles.add(h to Rect().also { node.getBoundsInScreen(it) }.top)
+                }
+                if (chat.show == null) {
+                    chat.show = sources?.trusted?.title(text, packageInFront in SourceCheck.VIDEO_APPS)
+                }
+            }
             // Short badges such as "AI info" are labels the app itself displays.
             if (!aiLabel[0] && Scoring.isAiLabel(text)) aiLabel[0] = true
             if (text != null && text.length >= Finding.MIN_CHARS) {
@@ -250,18 +276,64 @@ class ContentFlagService : AccessibilityService() {
         }
     }
 
+    /**
+     * Marks findings that come from a known source: the site in the address
+     * bar, the username shown above the passage (its poster), or, for highly
+     * charged wording only, a TV series on screen. Being mentioned in a
+     * passage never counts. Reports by the user always win.
+     */
+    private fun applyTrust(
+        pkg: String, notes: ScreenNotes, found: MutableList<Finding>, maybe: MutableList<Finding>,
+    ): List<Finding> {
+        val check = sources ?: return emptyList()
+        val page = check.trusted?.domain(notes.pageHost)
+        val all = found + maybe
+        val tops = all.map { it.bounds.top }
+        val authors = TrustedSources.authors(tops, notes.handles)
+        val rescan = {
+            handler.post {
+                if (connected && !scanPending) {
+                    scanPending = true
+                    handler.postDelayed({
+                        scanPending = false
+                        scan()
+                    }, SCAN_DELAY_MS)
+                }
+            }
+            Unit
+        }
+        val trusted = ArrayList<Finding>()
+        for ((i, f) in all.withIndex()) {
+            if (f.kind == "reported" || !f.key.startsWith("t:")) continue
+            val author = authors[i]
+            val source = page?.let { "on ${it.description}" }
+                ?: author?.let { a -> check.account(a, pkg, rescan)?.let { "posted by ${it.description}" } }
+                ?: notes.show?.takeIf { f.kind == "charge" }?.let { "describes ${it.description}" }
+                ?: continue
+            f.trustedBy = source
+            trusted.add(f)
+        }
+        return trusted
+    }
+
     private fun appName(pkg: String): String = appNames.getOrPut(pkg) { AppModes.appName(this, pkg) }
 
-    private class ChatScreen {
+    private class ScreenNotes {
         var hasMessageBox = false
         var title: String? = null
+        /** Elements whose whole text is a username, with their top edge: who posted what. */
+        val handles = ArrayList<Pair<String, Int>>()
+        /** The site a browser is showing, from its address bar. */
+        var pageHost: String? = null
+        /** A known TV series whose title is on screen. */
+        var show: TrustedSources.Source? = null
     }
 
     /**
      * Follows long-running scam stages in chat screens. Only stage markers are
      * stored, under a one-way hash of the app and chat title.
      */
-    private fun watchChat(pkg: String, chat: ChatScreen, texts: List<String>) {
+    private fun watchChat(pkg: String, chat: ScreenNotes, texts: List<String>) {
         val sample = pkg == packageName
         if (!Prefs.watchChats(this) || !chat.hasMessageBox || !(sample || pkg in ChatWatch.CHAT_APPS)) {
             hideBanner()
@@ -407,7 +479,7 @@ class ContentFlagService : AccessibilityService() {
             textFindings.none { overlapsMostly(v.bounds, it.bounds) } && ReportStore.fingerprint(v.key) !in notAProblem
         }
         val all = dropNested(textFindings + fromImages)
-        if (record) FlagLog.record(appInFront, all + possible, screenEntities, System.currentTimeMillis())
+        if (record) FlagLog.record(appInFront, all + possible + notHidden, screenEntities, System.currentTimeMillis())
         val screenArea = screen.width().toLong() * screen.height()
         val hide = Prefs.hideFlagged(this) && coversAllowed
         // Less certain "possible" flags are covered as well, unless the user turned that off.
@@ -427,6 +499,7 @@ class ContentFlagService : AccessibilityService() {
         }
         if (toCover.isNotEmpty()) parts.add("${toCover.size} hidden")
         if (possible.isNotEmpty()) parts.add("${possible.size} possibly flagged")
+        if (notHidden.isNotEmpty()) parts.add("${notHidden.size} from known sources")
         if (textAiLabel || visionAiLabel) parts.add("AI label on screen")
         if (pressure) parts.add("pressure wording")
         if (parts.isEmpty() || pillDismissed) hidePill()

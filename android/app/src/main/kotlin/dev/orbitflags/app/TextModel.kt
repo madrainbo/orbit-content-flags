@@ -89,7 +89,7 @@ class TextModel(context: Context) {
                 else if (pending.size < MAX_PENDING && pending.add(t)) todo.add(t)
             }
         }
-        if (todo.isNotEmpty()) {
+        if (todo.isNotEmpty()) try {
             worker.execute {
                 var scored = 0
                 for (t in todo) {
@@ -109,13 +109,23 @@ class TextModel(context: Context) {
                 Log.d(TAG, "scored $scored passages")
                 onReady()
             }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            // Closing down; nothing more is scored.
         }
         return known
     }
 
+    /** Releases the model after scoring in progress has finished, never during it. */
     fun close() {
-        worker.shutdownNow()
-        embedder.close()
+        worker.shutdown()
+        Thread {
+            try {
+                worker.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS)
+            } catch (e: InterruptedException) {
+                // Close anyway; judge() is synchronized on this object, so it cannot be mid-run.
+            }
+            synchronized(this) { embedder.close() }
+        }.start()
     }
 
     companion object {

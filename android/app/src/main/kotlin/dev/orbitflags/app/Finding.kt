@@ -16,6 +16,9 @@ class Finding(
     /** True when the text model is only fairly sure: listed, but never covered. */
     val possible: Boolean = false,
 ) {
+    /** Set when the content comes from a known source; it is then listed but never covered. */
+    var trustedBy: String? = null
+
     companion object {
         const val MIN_CHARS = 12
 

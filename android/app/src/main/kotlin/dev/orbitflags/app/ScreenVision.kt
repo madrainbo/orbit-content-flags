@@ -200,9 +200,19 @@ class ScreenVision(private val service: AccessibilityService) {
             private set
     }
 
+    /**
+     * Releases the models only after any analysis in progress has finished:
+     * freeing a model while it is running crashes the process.
+     */
     fun close() {
-        worker.shutdownNow()
-        recognizer.close()
-        classifier?.close()
+        try {
+            worker.execute {
+                recognizer.close()
+                classifier?.close()
+            }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            // Already closed.
+        }
+        worker.shutdown()
     }
 }
